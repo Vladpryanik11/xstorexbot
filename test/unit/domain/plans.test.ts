@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { escapeHtml } from '../../../src/domain/html.js';
 import { formatRub, monthlyPriceRub } from '../../../src/domain/money.js';
-import { planButtonLabel, planScreenText } from '../../../src/domain/plans.js';
+import { bestPlanId, planButtonLabel, planScreenText } from '../../../src/domain/plans.js';
 
 const p90 = { id: 2, days: 90, priceRub: 117000, priceStars: null };
 
@@ -19,8 +19,31 @@ describe('money', () => {
 });
 
 describe('plans', () => {
-  it('builds the button label', () => {
-    expect(planButtonLabel(p90)).toBe('90 дней — 1170 ₽');
+  it('builds the button label: monthly price, then days', () => {
+    expect(planButtonLabel(p90, false)).toBe('390 ₽/мес. — 90 дней');
+    expect(planButtonLabel({ id: 1, days: 30, priceRub: 49000, priceStars: null }, false)).toBe(
+      '490 ₽/мес. — 30 дней',
+    );
+  });
+
+  it('marks the best plan with a star', () => {
+    expect(planButtonLabel({ id: 3, days: 180, priceRub: 174000, priceStars: null }, true)).toBe(
+      '⭐ 290 ₽/мес. — 180 дней',
+    );
+  });
+
+  it('best plan: lowest monthly price, longer on tie, none for fewer than two plans', () => {
+    const p = (id: number, days: number, priceRub: number) => ({
+      id,
+      days,
+      priceRub,
+      priceStars: null,
+    });
+    expect(bestPlanId([p(1, 30, 49000), p(2, 90, 117000), p(3, 180, 174000)])).toBe(3);
+    expect(bestPlanId([p(1, 30, 49000), p(2, 90, 150000)])).toBe(1);
+    expect(bestPlanId([p(1, 30, 30000), p(2, 60, 60000)])).toBe(2);
+    expect(bestPlanId([p(1, 30, 49000)])).toBeNull();
+    expect(bestPlanId([])).toBeNull();
   });
 
   it('builds the plan screen with an escaped offer link', () => {

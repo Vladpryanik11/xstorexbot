@@ -4,22 +4,22 @@ import { planScreenText } from '../../../src/domain/plans.js';
 import { texts } from '../../../src/texts.js';
 import { createHarness } from '../helpers/harness.js';
 
-type Btn = { text: string; callback_data?: string; url?: string };
+type Btn = { text: string; callback_data?: string; url?: string; style?: string };
 const buttons = (payload: Record<string, unknown>): Btn[] =>
   (payload.reply_markup as { inline_keyboard: Btn[][] }).inline_keyboard.flat();
 
 describe('тарифы', () => {
-  it('menu:buy показывает список тарифов', async () => {
+  it('menu:buy показывает тарифы с ценой за месяц, выгодный — синий со звездой', async () => {
     const h = createHarness();
     await h.press('menu:buy');
     expect(h.calls.some((c) => c.method === 'answerCallbackQuery')).toBe(true);
     const msg = h.calls.find((c) => c.method === 'sendMessage');
     expect(msg?.payload.text).toBe('Выберите срок подписки:');
     expect(buttons(msg?.payload ?? {})).toEqual([
-      { text: '30 дней — 490 ₽', callback_data: 'plan:1' },
-      { text: '90 дней — 1170 ₽', callback_data: 'plan:2' },
-      { text: '180 дней — 1740 ₽', callback_data: 'plan:3' },
-      { text: 'Назад', callback_data: 'menu:start' },
+      { text: '490 ₽/мес. — 30 дней', callback_data: 'plan:1' },
+      { text: '390 ₽/мес. — 90 дней', callback_data: 'plan:2' },
+      { text: '⭐ 290 ₽/мес. — 180 дней', callback_data: 'plan:3', style: 'primary' },
+      { text: '‹ Назад', callback_data: 'menu:start' },
     ]);
   });
 
@@ -45,7 +45,9 @@ describe('тарифы', () => {
     );
     expect(edit?.payload.parse_mode).toBe('HTML');
     expect(edit?.payload.link_preview_options).toEqual({ is_disabled: true });
-    expect(buttons(edit?.payload ?? {})).toEqual([{ text: 'Назад', callback_data: 'menu:plans' }]);
+    expect(buttons(edit?.payload ?? {})).toEqual([
+      { text: '‹ Назад', callback_data: 'menu:plans' },
+    ]);
   });
 
   it('menu:plans возвращает список в то же сообщение', async () => {

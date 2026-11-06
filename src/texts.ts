@@ -6,7 +6,7 @@ export const texts = {
     about: 'О сервисе',
     support: 'Поддержка',
     mySubscription: 'Моя подписка',
-    back: 'Назад',
+    back: '‹ Назад',
   },
   subscriptionActiveUntil: (date: string) => `Подписка активна до ${date}`,
   planListTitle: 'Выберите срок подписки:',

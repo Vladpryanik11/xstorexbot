@@ -4,8 +4,22 @@ import { formatRub, monthlyPriceRub } from './money.js';
 /** `priceRub` в копейках, как поле `Plan.priceRub` в базе. */
 export type PlanView = { id: number; days: number; priceRub: number; priceStars: number | null };
 
-export function planButtonLabel(plan: PlanView): string {
-  return `${plan.days} дней — ${formatRub(plan.priceRub)}`;
+/** «490 ₽/мес. — 30 дней»; выгодный тариф помечен звездой. */
+export function planButtonLabel(plan: PlanView, best: boolean): string {
+  const perMonth = formatRub(monthlyPriceRub(plan.priceRub, plan.days) * 100);
+  return `${best ? '⭐ ' : ''}${perMonth}/мес. — ${plan.days} дней`;
+}
+
+/** Тариф с наименьшей ценой за день (при равенстве — более длинный); null, если тарифов меньше двух. */
+export function bestPlanId(plans: readonly PlanView[]): number | null {
+  if (plans.length < 2) return null;
+  let best = plans[0] as PlanView;
+  for (const plan of plans.slice(1)) {
+    // Сравнение цены за день без деления: plan.priceRub / plan.days против best.priceRub / best.days.
+    const diff = plan.priceRub * best.days - best.priceRub * plan.days;
+    if (diff < 0 || (diff === 0 && plan.days > best.days)) best = plan;
+  }
+  return best.id;
 }
 
 /** HTML для `parse_mode: 'HTML'`. */

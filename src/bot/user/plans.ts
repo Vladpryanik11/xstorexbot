@@ -1,5 +1,5 @@
 import { type Composer, GrammyError, InlineKeyboard } from 'grammy';
-import { planButtonLabel, planScreenText } from '../../domain/plans.js';
+import { bestPlanId, planButtonLabel, planScreenText } from '../../domain/plans.js';
 import { texts } from '../../texts.js';
 import { cb, parsePlanId } from '../callback-data.js';
 import type { BotContext } from '../context.js';
@@ -19,7 +19,13 @@ export function registerPlans<C extends BotContext>(composer: Composer<C>, deps:
       };
     }
     const keyboard = new InlineKeyboard();
-    for (const plan of plans) keyboard.text(planButtonLabel(plan), cb.plan(plan.id)).row();
+    const bestId = bestPlanId(plans);
+    for (const plan of plans) {
+      const best = plan.id === bestId;
+      keyboard.text(planButtonLabel(plan, best), cb.plan(plan.id));
+      if (best) keyboard.style('primary');
+      keyboard.row();
+    }
     keyboard.text(texts.buttons.back, cb.menu('start'));
     return { text: texts.planListTitle, keyboard };
   }
