@@ -37,6 +37,7 @@ export function createBroadcasts(opts: {
   const progressIntervalMs = opts.progressIntervalMs ?? 5000;
 
   const stopRequested = new Set<number>();
+  let shuttingDown = false;
   let loop: Promise<void> = Promise.resolve();
   let loopBroadcastId: number | null = null;
 
@@ -75,14 +76,14 @@ export function createBroadcasts(opts: {
     const markup = buttonMarkup(b.button);
     let lastEditAt = clock().getTime();
 
-    while (!stopRequested.has(b.id)) {
+    while (!stopRequested.has(b.id) && !shuttingDown) {
       const batch = await store.pending(b.id, BATCH_SIZE);
       if (batch.length === 0) break;
 
       for (const userId of batch) {
         let handled = false;
         while (!handled) {
-          if (stopRequested.has(b.id)) return;
+          if (stopRequested.has(b.id) || shuttingDown) return;
           try {
             await opts
               .api()
@@ -118,7 +119,7 @@ export function createBroadcasts(opts: {
         }
       }
     }
-    if (!stopRequested.has(b.id)) await store.finish(b.id, 'DONE', clock());
+    if (!stopRequested.has(b.id) && !shuttingDown) await store.finish(b.id, 'DONE', clock());
   }
 
   /** Финальная правка прогресса без кнопки и отчёт новым сообщением; сбой отчёта не критичен. */
@@ -135,16 +136,29 @@ export function createBroadcasts(opts: {
     }
   }
 
+  /** Без деталей ошибки: текст фиксированный; сбой уведомления только логируется. */
+  async function notifyPaused(id: number): Promise<void> {
+    try {
+      const b = await store.get(id);
+      if (b) await opts.api().sendMessage(b.adminId, texts.admin.broadcastPaused);
+    } catch (err) {
+      logFailure('broadcast pause notice failed', err);
+    }
+  }
+
   async function runLoop(id: number): Promise<void> {
     try {
       const b = await store.get(id);
       if (b?.status !== 'RUNNING') return;
       await sendAll(b);
+      // Остановка процесса: статус остаётся RUNNING, отчёт придёт после возобновления.
+      if (shuttingDown) return;
       // Отчёт и после остановки, и после прерывания, и после обычного конца.
       await finalize(b.adminId, b.progressMessageId, id);
     } catch (err) {
       // Рассылка остаётся RUNNING и продолжится после перезапуска (resume).
       logFailure('broadcast loop aborted', err);
+      await notifyPaused(id);
     } finally {
       stopRequested.delete(id);
       // Состояние могло уже перейти к более новой рассылке.
@@ -177,12 +191,15 @@ export function createBroadcasts(opts: {
     },
 
     async stop(adminId, broadcastId) {
+      // Решение о цикле принимается до await: цикл мог закончиться, пока store.stop в пути.
+      const local = loopBroadcastId === broadcastId;
+      if (local) stopRequested.add(broadcastId);
       const stopped = await store.stop(adminId, broadcastId, clock());
-      if (!stopped) return false;
-      if (loopBroadcastId === broadcastId) {
-        stopRequested.add(broadcastId);
-        return true;
+      if (!stopped) {
+        if (local) stopRequested.delete(broadcastId);
+        return false;
       }
+      if (local) return true;
       // Цикла в этом процессе нет (прервался или ещё не возобновлён): отчёт отправляем сами.
       const b = await store.get(broadcastId);
       if (b) await finalize(b.adminId, b.progressMessageId, broadcastId);
@@ -193,6 +210,10 @@ export function createBroadcasts(opts: {
       if (loopBroadcastId !== null) return;
       const id = await store.running();
       if (id !== null) launch(id);
+    },
+
+    shutdown() {
+      shuttingDown = true;
     },
 
     idle: () => loop,

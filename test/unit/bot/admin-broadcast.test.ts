@@ -133,6 +133,11 @@ describe('раздел «Рассылка»', () => {
       },
     ]);
     expect(h.adminInput.get(1)).toBeUndefined();
+    // Экран закрыт: кнопки «Остановить» нет ни у одного сообщения (она у сообщения отправителя).
+    expect(JSON.stringify(sent(h.calls).map((c) => c.payload.reply_markup))).not.toContain(
+      'adm:bc:stop',
+    );
+    expect(h.calls.some((c) => c.method === 'deleteMessage')).toBe(true);
   });
 
   it('стикер и часть альбома: отказ, ввод остаётся, следующий текст принимается', async () => {

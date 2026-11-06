@@ -7,7 +7,7 @@ import type { BotDeps } from '../create-bot.js';
 import type { Screens } from '../screens.js';
 import { type AdminInput, onInput } from './input.js';
 
-const PLAN_DATA = /^adm:plan:(\d+)(?::(rub|stars|toggle))?$/;
+const PLAN_DATA = /^adm:plan:(\d+)(?::(rub|stars|on|off))?$/;
 
 export function registerPlansSection<C extends BotContext>(
   composer: Composer<C>,
@@ -29,7 +29,7 @@ export function registerPlansSection<C extends BotContext>(
       .row()
       .text(
         plan.enabled ? t.planButtons.hide : t.planButtons.enable,
-        cb.admin(`plan:${plan.id}:toggle`),
+        cb.admin(`plan:${plan.id}:${plan.enabled ? 'off' : 'on'}`),
       )
       .row()
       .text(texts.buttons.back, cb.admin('plans'));
@@ -74,8 +74,10 @@ export function registerPlansSection<C extends BotContext>(
       );
       return;
     }
-    if (action === 'toggle') {
-      await deps.admin.setPlanEnabled(adminId, planId, !plan.enabled);
+    if (action === 'on' || action === 'off') {
+      // Целевое состояние в кнопке: повторное нажатие ничего не пишет и не логирует.
+      const target = action === 'on';
+      if (plan.enabled !== target) await deps.admin.setPlanEnabled(adminId, planId, target);
     }
     await showCard(ctx, planId);
   });

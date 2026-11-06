@@ -215,6 +215,10 @@ export class FakeBroadcasts implements Broadcasts {
     this.log('resume');
   }
 
+  shutdown(): void {
+    this.log('shutdown');
+  }
+
   async idle(): Promise<void> {
     this.log('idle');
   }

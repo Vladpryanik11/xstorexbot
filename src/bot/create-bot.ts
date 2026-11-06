@@ -50,6 +50,8 @@ export function createBot(
   registerServiceCommands(priv, deps);
   const screens = new Screens();
   registerAdmin(priv, deps, screens, adminInput);
+  // Админские кнопки уже обработаны отфильтрованным композером; сюда доходят только не админы.
+  priv.callbackQuery(/^adm:/, (ctx) => ctx.answerCallbackQuery({ text: texts.noRights }));
   registerStart(priv, deps, screens);
   registerPlans(priv, deps, screens);
   // Обработчики кнопок этапа 2 добавляются выше; всё, что осталось, устарело.

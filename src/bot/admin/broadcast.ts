@@ -128,7 +128,8 @@ export function registerBroadcastSection<C extends BotContext>(
       await screens.show(ctx, () => ctx.reply(t.broadcastRunning, { reply_markup: back('bc') }));
       return;
     }
-    await showSection(ctx);
+    // Прогресс показывает сообщение отправителя с кнопкой «Остановить»; второй экран не нужен.
+    await screens.close(ctx);
   });
 
   composer.callbackQuery(STOP_DATA, async (ctx) => {

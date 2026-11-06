@@ -26,6 +26,8 @@ export interface Broadcasts {
   /** false, если уже не идёт. */
   stop(adminId: number, broadcastId: number): Promise<boolean>;
   resume(): Promise<void>;
+  /** Остановка процесса: цикл выходит после текущего получателя, рассылка остаётся RUNNING. */
+  shutdown(): void;
   /** Ждёт окончания текущего цикла отправки (тесты, остановка). */
   idle(): Promise<void>;
 }

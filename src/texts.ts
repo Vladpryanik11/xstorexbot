@@ -14,6 +14,7 @@ export const texts = {
   paySupport: 'По вопросам оплаты и возврата напишите в поддержку.',
   terms: (url: string) => `Оферта сервиса: ${url}`,
   staleButton: 'Кнопка устарела, нажмите /start',
+  noRights: 'Нет прав',
   genericError: 'Что-то пошло не так, попробуйте ещё раз.',
   admin: {
     menuTitle: 'Админка',
@@ -84,6 +85,8 @@ export const texts = {
     badBroadcastButton: 'Не получилось. Формат: Название | https://адрес, название до 64 символов',
     broadcastRecipients: (n: number) => `Получателей: ${n}`,
     broadcastRunning: 'Уже идёт рассылка. Дождитесь окончания или остановите её',
+    broadcastPaused:
+      'Рассылка приостановлена из-за ошибки. Она продолжится после перезапуска бота, или нажмите «Остановить».',
     broadcastAlreadyFinished: 'Рассылка уже закончилась',
     broadcastProgress: (sent: number, total: number) => `Рассылка: отправлено ${sent} из ${total}`,
     broadcastTitles: {

@@ -51,11 +51,11 @@ describe('/admin', () => {
 });
 
 describe('кнопки админки', () => {
-  it('adm:base от не админа — «Кнопка устарела», счётчики не читаются', async () => {
+  it('adm:base от не админа — «Нет прав», счётчики не читаются', async () => {
     const h = createHarness();
     await h.press('adm:base');
     const answer = h.calls.find((c) => c.method === 'answerCallbackQuery');
-    expect(answer?.payload.text).toBe(texts.staleButton);
+    expect(answer?.payload.text).toBe(texts.noRights);
     expect(h.admin.calls).toEqual([]);
     expect(h.calls.some((c) => c.method === 'sendMessage')).toBe(false);
   });

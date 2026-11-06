@@ -109,11 +109,12 @@ async function main(): Promise<void> {
       await runner.stop();
       await runner.task();
       // Рассылка остаётся RUNNING и продолжится после перезапуска.
+      broadcasts.shutdown();
       let timer: NodeJS.Timeout | undefined;
       await Promise.race([
         broadcasts.idle(),
         new Promise<void>((resolve) => {
-          timer = setTimeout(resolve, 10_000);
+          timer = setTimeout(resolve, 5_000);
         }),
       ]);
       clearTimeout(timer);

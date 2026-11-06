@@ -1,10 +1,11 @@
 import { GrammyError, HttpError } from 'grammy';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBroadcasts } from '../../src/broadcast/index.js';
 import type { SenderApi } from '../../src/broadcast/sender.js';
 import { createBroadcastStore } from '../../src/broadcast/store.js';
 import type { BroadcastButton } from '../../src/broadcast/types.js';
 import type { Logger } from '../../src/logger.js';
+import { texts } from '../../src/texts.js';
 import { resetDb, testPrisma } from './helpers/db.js';
 
 const prisma = testPrisma();
@@ -356,5 +357,92 @@ describe('broadcast sender', () => {
     expect((await store.summary(id)).status).toBe('DONE');
     expect(JSON.stringify(s.logged)).toContain('broadcast report failed');
     expect(JSON.stringify(s.logged)).not.toContain('loop aborted');
+  });
+
+  it('notifies the admin when an unexpected error aborts the loop, status untouched', async () => {
+    await mkUsers([10, 11]);
+    const s = setup();
+    const spy = vi.spyOn(store, 'markSent').mockRejectedValueOnce(new TypeError('boom'));
+    try {
+      const res = await s.broadcasts.start(input);
+      if (!res.ok) throw new Error('start failed');
+      await s.broadcasts.idle();
+      expect((await store.summary(res.id)).status).toBe('RUNNING');
+      expect(s.sends.at(-1)).toMatchObject({ chatId: ADMIN, text: texts.admin.broadcastPaused });
+      expect(s.sends.some((x) => x.text.startsWith('Рассылка завершена'))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('a failing pause notice is logged and never throws', async () => {
+    await mkUsers([10]);
+    const s = setup();
+    const spy = vi.spyOn(store, 'markSent').mockRejectedValueOnce(new TypeError('boom'));
+    s.hooks.send = async (text) => {
+      if (text === texts.admin.broadcastPaused) throw new Error('send failed');
+    };
+    try {
+      const res = await s.broadcasts.start(input);
+      if (!res.ok) throw new Error('start failed');
+      await expect(s.broadcasts.idle()).resolves.toBeUndefined();
+      expect(JSON.stringify(s.logged)).toContain('broadcast pause notice failed');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('stop sends the report exactly once when the loop finishes while store.stop is pending', async () => {
+    await mkUsers([10]);
+    const s = setup();
+    let releaseCopy: () => void = () => {};
+    const copyGate = new Promise<void>((r) => {
+      releaseCopy = r;
+    });
+    s.hooks.copy = async () => {
+      await copyGate;
+    };
+    let releaseStop: () => void = () => {};
+    const stopGate = new Promise<void>((r) => {
+      releaseStop = r;
+    });
+    const realStop = store.stop.bind(store);
+    const spy = vi.spyOn(store, 'stop').mockImplementation(async (...args) => {
+      const result = await realStop(...args);
+      await stopGate;
+      return result;
+    });
+    try {
+      const res = await s.broadcasts.start(input);
+      if (!res.ok) throw new Error('start failed');
+      // Цикл уже внутри copyMessage: stop вызывается при живом цикле.
+      while (s.copies.length === 0) await new Promise((r) => setTimeout(r, 5));
+      const stopP = s.broadcasts.stop(ADMIN, res.id);
+      await new Promise((r) => setTimeout(r, 50));
+      releaseCopy();
+      await s.broadcasts.idle();
+      releaseStop();
+      expect(await stopP).toBe(true);
+      // Первое сообщение — прогресс, остальное — отчёты.
+      expect(s.sends.slice(1)).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('shutdown stops the loop after the current recipient without finishing or reporting', async () => {
+    await mkUsers([10, 11, 12]);
+    const s = setup();
+    s.hooks.copy = async () => {
+      if (s.copies.length === 1) s.broadcasts.shutdown();
+    };
+    const res = await s.broadcasts.start(input);
+    if (!res.ok) throw new Error('start failed');
+    await s.broadcasts.idle();
+    expect(s.copies).toHaveLength(1);
+    expect((await store.summary(res.id)).status).toBe('RUNNING');
+    // Только сообщение с прогрессом, отчёта нет.
+    expect(s.sends).toHaveLength(1);
+    expect(s.edits.some((e) => e.other === undefined)).toBe(false);
   });
 });

@@ -49,7 +49,7 @@ describe('раздел «Тарифы»', () => {
         { text: 'Цена ₽', callback_data: 'adm:plan:1:rub' },
         { text: 'Цена ⭐', callback_data: 'adm:plan:1:stars' },
       ],
-      [{ text: 'Скрыть', callback_data: 'adm:plan:1:toggle' }],
+      [{ text: 'Скрыть', callback_data: 'adm:plan:1:off' }],
       [{ text: '‹ Назад', callback_data: 'adm:plans' }],
     ]);
   });
@@ -60,7 +60,7 @@ describe('раздел «Тарифы»', () => {
     if (plan) plan.enabled = false;
     await h.press('adm:plan:1', { from: admin });
     expect(rows(sent(h.calls)[0]?.payload ?? {})[1]).toEqual([
-      { text: 'Включить', callback_data: 'adm:plan:1:toggle' },
+      { text: 'Включить', callback_data: 'adm:plan:1:on' },
     ]);
   });
 
@@ -119,18 +119,32 @@ describe('раздел «Тарифы»', () => {
       h.admin.calls.push({ method: 'setPlanEnabled', args: [adminId, planId, enabled] });
       if (plan) plan.enabled = enabled;
     };
-    await h.press('adm:plan:1:toggle', { from: admin });
+    await h.press('adm:plan:1:off', { from: admin });
     expect(h.admin.calls.filter((c) => c.method === 'setPlanEnabled')).toEqual([
       { method: 'setPlanEnabled', args: [1, 1, false] },
     ]);
     const card = sent(h.calls).at(-1);
     expect(card?.payload.text).toBe('30 дней · 490 ₽ · ⭐ не задана · скрыт');
     expect(rows(card?.payload ?? {})[1]).toEqual([
-      { text: 'Включить', callback_data: 'adm:plan:1:toggle' },
+      { text: 'Включить', callback_data: 'adm:plan:1:on' },
     ]);
   });
 
-  it.each(['adm:plan:999', 'adm:plan:999:rub', 'adm:plan:999:stars', 'adm:plan:999:toggle'])(
+  it('повторное «Скрыть» не пишет и не логирует второй раз', async () => {
+    const h = createHarness();
+    const plan = h.admin.plans[0];
+    h.admin.setPlanEnabled = async (adminId, planId, enabled) => {
+      h.admin.calls.push({ method: 'setPlanEnabled', args: [adminId, planId, enabled] });
+      if (plan) plan.enabled = enabled;
+    };
+    await h.press('adm:plan:1:off', { from: admin });
+    await h.press('adm:plan:1:off', { from: admin });
+    expect(h.admin.calls.filter((c) => c.method === 'setPlanEnabled')).toHaveLength(1);
+    expect(plan?.enabled).toBe(false);
+    expect(sent(h.calls).at(-1)?.payload.text).toBe('30 дней · 490 ₽ · ⭐ не задана · скрыт');
+  });
+
+  it.each(['adm:plan:999', 'adm:plan:999:rub', 'adm:plan:999:stars', 'adm:plan:999:off'])(
     '%s — «Кнопка устарела»',
     async (data) => {
       const h = createHarness();
@@ -158,7 +172,7 @@ describe('раздел «Тарифы»', () => {
   it('«Скрыть» сбрасывает начатый ввод цены', async () => {
     const h = createHarness();
     h.adminInput.set(1, { kind: 'priceStars', planId: 1 });
-    await h.press('adm:plan:1:toggle', { from: admin });
+    await h.press('adm:plan:1:off', { from: admin });
     expect(h.adminInput.get(1)).toBeUndefined();
   });
 });
