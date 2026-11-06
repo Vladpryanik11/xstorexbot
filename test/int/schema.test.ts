@@ -22,7 +22,7 @@ describe('schema', () => {
     await prisma.certRequest.create({ data: { userId: 1n, udid: 'A', status: 'OPEN' } });
     await expect(
       prisma.certRequest.create({ data: { userId: 1n, udid: 'B', status: 'OPEN' } }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: 'P2002' });
     await expect(
       prisma.certRequest.create({ data: { userId: 1n, udid: 'C', status: 'ISSUED' } }),
     ).resolves.toBeDefined();

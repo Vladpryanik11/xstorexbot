@@ -15,9 +15,9 @@ CREATE TABLE "User" (
     "id" BIGINT NOT NULL,
     "username" TEXT,
     "firstName" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "blockedAt" TIMESTAMP(3),
-    "udidExpectedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "blockedAt" TIMESTAMPTZ(3),
+    "udidExpectedAt" TIMESTAMPTZ(3),
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -37,12 +37,12 @@ CREATE TABLE "Plan" (
 -- CreateTable
 CREATE TABLE "Subscription" (
     "userId" BIGINT NOT NULL,
-    "endsAt" TIMESTAMP(3) NOT NULL,
-    "reminded3dAt" TIMESTAMP(3),
-    "reminded1dAt" TIMESTAMP(3),
-    "removedAt" TIMESTAMP(3),
+    "endsAt" TIMESTAMPTZ(3) NOT NULL,
+    "reminded3dAt" TIMESTAMPTZ(3),
+    "reminded1dAt" TIMESTAMPTZ(3),
+    "removedAt" TIMESTAMPTZ(3),
     "removeAttempts" INTEGER NOT NULL DEFAULT 0,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Subscription_pkey" PRIMARY KEY ("userId")
 );
@@ -60,10 +60,10 @@ CREATE TABLE "Payment" (
     "providerStatus" TEXT,
     "providerPaymentId" TEXT,
     "paymentUrl" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "paidAt" TIMESTAMP(3),
-    "appliedAt" TIMESTAMP(3),
-    "lastCheckedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "paidAt" TIMESTAMPTZ(3),
+    "appliedAt" TIMESTAMPTZ(3),
+    "lastCheckedAt" TIMESTAMPTZ(3),
     "createdByAdminId" BIGINT,
 
     CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
@@ -78,10 +78,10 @@ CREATE TABLE "CertRequest" (
     "p12Enc" BYTEA,
     "profileEnc" BYTEA,
     "passwordEnc" BYTEA,
-    "certExpiresAt" TIMESTAMP(3),
+    "certExpiresAt" TIMESTAMPTZ(3),
     "ordersChatMessageId" INTEGER,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "issuedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "issuedAt" TIMESTAMPTZ(3),
     "issuedByAdminId" BIGINT,
 
     CONSTRAINT "CertRequest_pkey" PRIMARY KEY ("id")
@@ -94,7 +94,7 @@ CREATE TABLE "AdminLog" (
     "action" TEXT NOT NULL,
     "targetUserId" BIGINT,
     "details" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AdminLog_pkey" PRIMARY KEY ("id")
 );

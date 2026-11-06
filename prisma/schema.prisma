@@ -37,9 +37,9 @@ model User {
   id             BigInt    @id
   username       String?
   firstName      String
-  createdAt      DateTime  @default(now())
-  blockedAt      DateTime?
-  udidExpectedAt DateTime?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  blockedAt      DateTime? @db.Timestamptz(3)
+  udidExpectedAt DateTime? @db.Timestamptz(3)
 
   subscription Subscription?
   payments     Payment[]
@@ -59,12 +59,12 @@ model Plan {
 
 model Subscription {
   userId         BigInt    @id
-  endsAt         DateTime
-  reminded3dAt   DateTime?
-  reminded1dAt   DateTime?
-  removedAt      DateTime?
+  endsAt         DateTime  @db.Timestamptz(3)
+  reminded3dAt   DateTime? @db.Timestamptz(3)
+  reminded1dAt   DateTime? @db.Timestamptz(3)
+  removedAt      DateTime? @db.Timestamptz(3)
   removeAttempts Int       @default(0)
-  updatedAt      DateTime  @updatedAt
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id])
 }
@@ -81,10 +81,10 @@ model Payment {
   providerStatus    String?
   providerPaymentId String?         @unique
   paymentUrl        String?
-  createdAt         DateTime        @default(now())
-  paidAt            DateTime?
-  appliedAt         DateTime?
-  lastCheckedAt     DateTime?
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
+  paidAt            DateTime?       @db.Timestamptz(3)
+  appliedAt         DateTime?       @db.Timestamptz(3)
+  lastCheckedAt     DateTime?       @db.Timestamptz(3)
   createdByAdminId  BigInt?
 
   user User  @relation(fields: [userId], references: [id])
@@ -95,18 +95,18 @@ model Payment {
 }
 
 model CertRequest {
-  id                   Int               @id @default(autoincrement())
-  userId               BigInt
-  udid                 String
-  status               CertRequestStatus @default(OPEN)
-  p12Enc               Bytes?
-  profileEnc           Bytes?
-  passwordEnc          Bytes?
-  certExpiresAt        DateTime?
-  ordersChatMessageId  Int?
-  createdAt            DateTime          @default(now())
-  issuedAt             DateTime?
-  issuedByAdminId      BigInt?
+  id                  Int               @id @default(autoincrement())
+  userId              BigInt
+  udid                String
+  status              CertRequestStatus @default(OPEN)
+  p12Enc              Bytes?
+  profileEnc          Bytes?
+  passwordEnc         Bytes?
+  certExpiresAt       DateTime?         @db.Timestamptz(3)
+  ordersChatMessageId Int?
+  createdAt           DateTime          @default(now()) @db.Timestamptz(3)
+  issuedAt            DateTime?         @db.Timestamptz(3)
+  issuedByAdminId     BigInt?
 
   user User @relation(fields: [userId], references: [id])
 
@@ -119,5 +119,5 @@ model AdminLog {
   action       String
   targetUserId BigInt?
   details      Json?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
 }
