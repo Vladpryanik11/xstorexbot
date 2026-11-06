@@ -66,6 +66,7 @@ export const texts = {
     confirmEnd: (who: string) => `Завершить подписку ${who} сейчас? Деньги не возвращаются`,
     subscriptionExtended: (date: string) => `Подписка продлена до ${date}`,
     joinChannel: 'Вступить в канал',
+    broadcastStopButton: 'Остановить',
     broadcastProgress: (sent: number, total: number) => `Рассылка: отправлено ${sent} из ${total}`,
     broadcastTitles: {
       DONE: 'Рассылка завершена.',
