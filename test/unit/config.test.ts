@@ -51,6 +51,15 @@ describe('loadConfig', () => {
     );
   });
 
+  it('falls back to ./content when CONTENT_DIR is empty', () => {
+    expect(loadConfig({ ...validEnv, CONTENT_DIR: '' }).contentDir).toBe('./content');
+  });
+
+  it('accepts a merchant id without RFC version bits', () => {
+    const id = '11111111-1111-1111-1111-111111111111';
+    expect(loadConfig({ ...validEnv, PLATEGA_MERCHANT_ID: id }).platega.merchantId).toBe(id);
+  });
+
   it('names invalid variables alphabetically', () => {
     const { BOT_TOKEN: _omit, ...rest } = validEnv;
     const err = failure({ ...rest, ADMIN_IDS: 'abc' });
@@ -85,6 +94,14 @@ describe('loadConfig', () => {
 });
 
 describe('secretValues', () => {
+  it('includes the raw key text even when it differs from canonical base64', () => {
+    const unpadded = key.replace(/=+$/, '');
+    expect(unpadded).not.toBe(key);
+    const values = secretValues(loadConfig({ ...validEnv, CERT_ENCRYPTION_KEY: unpadded }));
+    expect(values).toContain(unpadded);
+    expect(values).toContain(key);
+  });
+
   it('lists token, platega secret, key in base64 and passphrase', () => {
     expect(secretValues(loadConfig(validEnv))).toEqual([
       validEnv.BOT_TOKEN,

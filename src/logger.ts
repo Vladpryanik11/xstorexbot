@@ -6,10 +6,17 @@ export type { Logger };
 const MASK = '[скрыто]';
 
 export function redactSecrets(text: string, secrets: string[]): string {
-  let out = text;
+  // Строки лога — JSON: pino экранирует " и \, поэтому маскируем и экранированный вид.
+  const candidates = new Set<string>();
   for (const secret of secrets) {
-    if (secret) out = out.split(secret).join(MASK);
+    if (!secret) continue;
+    candidates.add(secret);
+    candidates.add(JSON.stringify(secret).slice(1, -1));
   }
+  // Сначала длинные: короткий секрет внутри длинного не оставит его обрывок.
+  const ordered = [...candidates].sort((x, y) => y.length - x.length);
+  let out = text;
+  for (const c of ordered) out = out.split(c).join(MASK);
   return out;
 }
 

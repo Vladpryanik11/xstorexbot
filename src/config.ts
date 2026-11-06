@@ -12,6 +12,8 @@ export interface Config {
   links: { catalog: string; reviews: string; support: string; offer: string; udidHelp: string };
   platega: { merchantId: string; secret: string };
   certEncryptionKey: Buffer;
+  /** Исходный текст CERT_ENCRYPTION_KEY из .env, нужен для маскирования в логах. */
+  certEncryptionKeyText: string;
   backupPassphrase: string;
   contentDir: string;
 }
@@ -59,7 +61,7 @@ const schema = z.object({
   SUPPORT_URL: httpsUrl,
   OFFER_URL: httpsUrl,
   UDID_HELP_URL: httpsUrl,
-  PLATEGA_MERCHANT_ID: z.uuid(),
+  PLATEGA_MERCHANT_ID: z.guid(),
   PLATEGA_SECRET: z.string().min(1),
   CERT_ENCRYPTION_KEY: encryptionKey,
   BACKUP_PASSPHRASE: z.string().min(16),
@@ -97,6 +99,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     },
     platega: { merchantId: e.PLATEGA_MERCHANT_ID, secret: e.PLATEGA_SECRET },
     certEncryptionKey: e.CERT_ENCRYPTION_KEY,
+    certEncryptionKeyText: input.CERT_ENCRYPTION_KEY ?? '',
     backupPassphrase: e.BACKUP_PASSPHRASE,
     contentDir: e.CONTENT_DIR,
   };
@@ -104,9 +107,12 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 
 export function secretValues(config: Config): string[] {
   return [
-    config.botToken,
-    config.platega.secret,
-    config.certEncryptionKey.toString('base64'),
-    config.backupPassphrase,
+    ...new Set([
+      config.botToken,
+      config.platega.secret,
+      config.certEncryptionKeyText,
+      config.certEncryptionKey.toString('base64'),
+      config.backupPassphrase,
+    ]),
   ];
 }
