@@ -12,7 +12,7 @@ export function testPrisma(): PrismaClient {
 /** Только для тестов: очищает данные и возвращает три тарифа к начальным значениям. */
 export async function resetDb(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "User", "Subscription", "Payment", "CertRequest", "AdminLog" CASCADE',
+    'TRUNCATE "User", "Subscription", "Payment", "CertRequest", "AdminLog", "Broadcast", "BroadcastRecipient" CASCADE',
   );
   await prisma.plan.deleteMany();
   await prisma.$executeRawUnsafe(

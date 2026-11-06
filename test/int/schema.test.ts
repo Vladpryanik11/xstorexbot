@@ -27,4 +27,23 @@ describe('schema', () => {
       prisma.certRequest.create({ data: { userId: 1n, udid: 'C', status: 'ISSUED' } }),
     ).resolves.toBeDefined();
   });
+
+  it('вторая рассылка RUNNING запрещена индексом', async () => {
+    const data = { adminId: 1n, sourceChatId: 1n, sourceMessageId: 1, total: 0 };
+    await prisma.broadcast.create({ data });
+    await expect(prisma.broadcast.create({ data })).rejects.toMatchObject({ code: 'P2002' });
+    await prisma.broadcast.create({ data: { ...data, status: 'DONE' } }); // не мешает
+  });
+
+  it('у нового пользователя lastSeenAt заполнен', async () => {
+    const u = await prisma.user.create({ data: { id: 1n, firstName: 'А' } });
+    expect(u.lastSeenAt).toBeInstanceOf(Date);
+  });
+
+  it('есть индекс по lower(username)', async () => {
+    const rows = await prisma.$queryRawUnsafe<{ indexdef: string }[]>(
+      `SELECT indexdef FROM pg_indexes WHERE tablename = 'User'`,
+    );
+    expect(rows.some((r) => r.indexdef.includes('lower'))).toBe(true);
+  });
 });

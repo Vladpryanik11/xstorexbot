@@ -40,10 +40,12 @@ model User {
   createdAt      DateTime  @default(now()) @db.Timestamptz(3)
   blockedAt      DateTime? @db.Timestamptz(3)
   udidExpectedAt DateTime? @db.Timestamptz(3)
+  lastSeenAt     DateTime  @default(now()) @db.Timestamptz(3)
 
-  subscription Subscription?
-  payments     Payment[]
-  certRequests CertRequest[]
+  subscription        Subscription?
+  payments            Payment[]
+  certRequests        CertRequest[]
+  broadcastRecipients BroadcastRecipient[]
 }
 
 model Plan {
@@ -120,4 +122,48 @@ model AdminLog {
   targetUserId BigInt?
   details      Json?
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
+}
+
+enum BroadcastStatus {
+  RUNNING
+  DONE
+  STOPPED
+  FAILED
+}
+
+enum RecipientStatus {
+  PENDING
+  SENT
+  BLOCKED
+  FAILED
+}
+
+model Broadcast {
+  id                Int             @id @default(autoincrement())
+  adminId           BigInt
+  sourceChatId      BigInt
+  sourceMessageId   Int
+  buttonText        String?
+  buttonUrl         String?
+  status            BroadcastStatus @default(RUNNING)
+  total             Int
+  progressMessageId Int?
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
+  finishedAt        DateTime?       @db.Timestamptz(3)
+
+  recipients BroadcastRecipient[]
+}
+
+model BroadcastRecipient {
+  broadcastId Int
+  userId      BigInt
+  status      RecipientStatus @default(PENDING)
+  error       String?
+  sentAt      DateTime?       @db.Timestamptz(3)
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@id([broadcastId, userId])
+  @@index([broadcastId, status])
 }
