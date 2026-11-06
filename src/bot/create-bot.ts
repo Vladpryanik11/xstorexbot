@@ -1,10 +1,13 @@
 import { Bot } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
+import type { AdminServices } from '../admin/index.js';
+import type { Broadcasts } from '../broadcast/types.js';
 import type { Config } from '../config.js';
 import type { Content } from '../content.js';
 import type { Logger } from '../logger.js';
 import type { Services } from '../services/index.js';
 import { texts } from '../texts.js';
+import { AdminInput, registerAdmin } from './admin/index.js';
 import { handleBotError } from './errors.js';
 import { touchUserMiddleware } from './middleware.js';
 import { type Clock, createOrdersChat } from './orders-chat.js';
@@ -22,9 +25,16 @@ export interface BotDeps {
   services: Services;
   logger: Logger;
   clock: Clock;
+  admin: AdminServices;
+  broadcasts: Broadcasts;
 }
 
-export function createBot(token: string, deps: BotDeps, botInfo?: UserFromGetMe): Bot {
+export function createBot(
+  token: string,
+  deps: BotDeps,
+  botInfo?: UserFromGetMe,
+  adminInput: AdminInput = new AdminInput(),
+): Bot {
   const bot = new Bot(token, botInfo ? { botInfo } : undefined);
   const ordersChat = createOrdersChat({
     send: (text) => bot.api.sendMessage(deps.config.ordersChatId, text),
@@ -38,6 +48,7 @@ export function createBot(token: string, deps: BotDeps, botInfo?: UserFromGetMe)
   registerChatMember(priv, deps);
   registerServiceCommands(priv, deps);
   const screens = new Screens();
+  registerAdmin(priv, deps, screens, adminInput);
   registerStart(priv, deps, screens);
   registerPlans(priv, deps, screens);
   // Обработчики кнопок этапа 2 добавляются выше; всё, что осталось, устарело.

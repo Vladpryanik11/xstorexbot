@@ -1,12 +1,24 @@
 import { autoRetry } from '@grammyjs/auto-retry';
 import { run } from '@grammyjs/runner';
+import { createAdminServices } from './admin/index.js';
 import { createBot } from './bot/create-bot.js';
+import type { Broadcasts } from './broadcast/types.js';
 import { type Config, ConfigError, loadConfig, secretValues } from './config.js';
 import { ContentError, loadContent } from './content.js';
 import { createPrisma } from './db.js';
 import { reportFatal } from './fatal.js';
 import { createLogger } from './logger.js';
 import { createServices } from './services/index.js';
+
+// TEMPORARY (задача 10 даёт реализацию, задача 12 подключает её здесь): пока рассылок нет.
+const temporaryBroadcastsStub: Broadcasts = {
+  countRecipients: async () => 0,
+  current: async () => null,
+  start: async () => ({ ok: false, reason: 'running' }),
+  stop: async () => false,
+  resume: async () => {},
+  idle: async () => {},
+};
 
 function fail(message: string): never {
   process.stderr.write(`${message}\n`);
@@ -64,6 +76,8 @@ async function main(): Promise<void> {
     services,
     logger,
     clock: () => new Date(),
+    admin: createAdminServices(prisma),
+    broadcasts: temporaryBroadcastsStub,
   });
   // Не включать rethrowHttpErrors: тогда runner сам делает console.error для ошибок node-fetch,
   // а в их тексте есть URL с токеном бота.

@@ -20,7 +20,7 @@ describe('my_chat_member', () => {
     const h = createHarness();
     await h.chatMember('member');
     h.services.blocked.clear();
-    await h.chatMember('left' as never);
+    await h.chatMember('left');
     expect(h.services.blocked.size).toBe(0);
   });
 });

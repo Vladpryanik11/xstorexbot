@@ -1,8 +1,17 @@
 import { type Bot, BotError } from 'grammy';
-import type { Update, UserFromGetMe } from 'grammy/types';
+import type { Message, Update, UserFromGetMe } from 'grammy/types';
 import { pino } from 'pino';
+import type { AdminServices } from '../../../src/admin/index.js';
+import { AdminInput } from '../../../src/bot/admin/index.js';
 import { type BotDeps, createBot } from '../../../src/bot/create-bot.js';
+import type { BroadcastSummary, Broadcasts } from '../../../src/broadcast/types.js';
 import type { Config } from '../../../src/config.js';
+import type {
+  BaseStats,
+  PlanAdminView,
+  SubscriberCard,
+  SubscriberQuery,
+} from '../../../src/domain/admin.js';
 import type { PlanView } from '../../../src/domain/plans.js';
 import type { Services, TelegramFrom } from '../../../src/services/index.js';
 
@@ -87,6 +96,130 @@ export class FakeServices implements Services {
   }
 }
 
+export interface ServiceCall {
+  method: string;
+  args: unknown[];
+}
+
+export class FakeAdminServices implements AdminServices {
+  /** Все вызовы по порядку: удобно проверять, что чего-то не вызывали. */
+  calls: ServiceCall[] = [];
+  plans: PlanAdminView[] = [
+    { id: 1, days: 30, priceRub: 49000, priceStars: null, enabled: true },
+    { id: 2, days: 90, priceRub: 117000, priceStars: null, enabled: true },
+    { id: 3, days: 180, priceRub: 174000, priceStars: null, enabled: true },
+  ];
+  stats: BaseStats = { users: 0, reachable: 0, blocked: 0, active: 0 };
+  /** id найденного подписчика; null — не найден. */
+  foundUserId: number | null = null;
+  card: SubscriberCard | null = null;
+  addDaysResult: { endsAt: Date; paymentId: string } = {
+    endsAt: new Date('2026-12-06T12:00:00Z'),
+    paymentId: 'manual-1',
+  };
+  endSubscriptionResult = true;
+
+  private log(method: string, ...args: unknown[]): void {
+    this.calls.push({ method, args });
+  }
+
+  async listAllPlans(): Promise<PlanAdminView[]> {
+    this.log('listAllPlans');
+    return this.plans;
+  }
+
+  async getPlan(id: number): Promise<PlanAdminView | null> {
+    this.log('getPlan', id);
+    return this.plans.find((p) => p.id === id) ?? null;
+  }
+
+  async setPlanPriceRub(adminId: number, planId: number, kopecks: number): Promise<void> {
+    this.log('setPlanPriceRub', adminId, planId, kopecks);
+  }
+
+  async setPlanPriceStars(adminId: number, planId: number, stars: number | null): Promise<void> {
+    this.log('setPlanPriceStars', adminId, planId, stars);
+  }
+
+  async setPlanEnabled(adminId: number, planId: number, enabled: boolean): Promise<void> {
+    this.log('setPlanEnabled', adminId, planId, enabled);
+  }
+
+  async findUserId(query: SubscriberQuery): Promise<number | null> {
+    this.log('findUserId', query);
+    return this.foundUserId;
+  }
+
+  async getSubscriberCard(userId: number): Promise<SubscriberCard | null> {
+    this.log('getSubscriberCard', userId);
+    return this.card;
+  }
+
+  async addDays(
+    adminId: number,
+    userId: number,
+    days: number,
+    now: Date,
+  ): Promise<{ endsAt: Date; paymentId: string }> {
+    this.log('addDays', adminId, userId, days, now);
+    return this.addDaysResult;
+  }
+
+  async endSubscription(adminId: number, userId: number, now: Date): Promise<boolean> {
+    this.log('endSubscription', adminId, userId, now);
+    return this.endSubscriptionResult;
+  }
+
+  async baseStats(now: Date): Promise<BaseStats> {
+    this.log('baseStats', now);
+    return this.stats;
+  }
+}
+
+export class FakeBroadcasts implements Broadcasts {
+  calls: ServiceCall[] = [];
+  recipients = 0;
+  summary: BroadcastSummary | null = null;
+  startResult: { ok: true; id: number; total: number } | { ok: false; reason: 'running' } = {
+    ok: true,
+    id: 1,
+    total: 0,
+  };
+  stopResult = true;
+
+  private log(method: string, ...args: unknown[]): void {
+    this.calls.push({ method, args });
+  }
+
+  async countRecipients(): Promise<number> {
+    this.log('countRecipients');
+    return this.recipients;
+  }
+
+  async current(): Promise<BroadcastSummary | null> {
+    this.log('current');
+    return this.summary;
+  }
+
+  async start(input: Parameters<Broadcasts['start']>[0]): ReturnType<Broadcasts['start']> {
+    this.log('start', input);
+    return this.startResult;
+  }
+
+  async stop(adminId: number, broadcastId: number): Promise<boolean> {
+    this.log('stop', adminId, broadcastId);
+    return this.stopResult;
+  }
+
+  async resume(): Promise<void> {
+    this.log('resume');
+  }
+
+  async idle(): Promise<void> {
+    this.log('idle');
+  }
+}
+
 export interface Call {
   method: string;
   payload: Record<string, unknown>;
@@ -94,6 +227,9 @@ export interface Call {
 
 export function createHarness(overrides: Partial<BotDeps> = {}) {
   const services = new FakeServices();
+  const admin = new FakeAdminServices();
+  const broadcasts = new FakeBroadcasts();
+  const adminInput = new AdminInput();
   const now = { value: new Date('2026-11-06T12:00:00Z') };
   const deps: BotDeps = {
     config: testConfig(),
@@ -106,15 +242,21 @@ export function createHarness(overrides: Partial<BotDeps> = {}) {
     services,
     logger: pino({ level: 'silent' }),
     clock: () => now.value,
+    admin,
+    broadcasts,
     ...overrides,
   };
-  const bot: Bot = createBot(deps.config.botToken, deps, botInfo);
+  const bot: Bot = createBot(deps.config.botToken, deps, botInfo, adminInput);
   const calls: Call[] = [];
   let messageId = 100;
 
   bot.api.config.use(async (_prev, method, payload) => {
     const p = payload as Record<string, unknown>;
     calls.push({ method, payload: { ...p } });
+    if (method === 'copyMessage') {
+      messageId += 1;
+      return { ok: true, result: { message_id: messageId } } as never;
+    }
     if (method === 'sendMessage' || method === 'editMessageText') {
       messageId += 1;
       return {
@@ -158,9 +300,26 @@ export function createHarness(overrides: Partial<BotDeps> = {}) {
     text: string,
     opts: { chatType?: 'private' | 'group'; from?: Partial<TelegramFrom> } = {},
   ): Promise<void> {
-    const chatType = opts.chatType ?? 'private';
-    const from = { id: 42, first_name: 'Иван', username: 'ivan', ...opts.from };
     const command = /^\/\S+/.exec(text)?.[0];
+    await sendMessage(
+      {
+        text,
+        ...(command
+          ? { entities: [{ type: 'bot_command' as const, offset: 0, length: command.length }] }
+          : {}),
+      },
+      opts.from,
+      opts.chatType,
+    );
+  }
+
+  /** Произвольное сообщение (фото, альбом, подпись…): поля `partial` перекрывают значения по умолчанию. */
+  async function sendMessage(
+    partial: Partial<Message>,
+    fromOverride: Partial<TelegramFrom> = {},
+    chatType: 'private' | 'group' = 'private',
+  ): Promise<void> {
+    const from = { id: 42, first_name: 'Иван', username: 'ivan', ...fromOverride };
     const update: Update = {
       update_id: updateId++,
       message: {
@@ -171,30 +330,28 @@ export function createHarness(overrides: Partial<BotDeps> = {}) {
             ? { id: from.id, type: 'private', first_name: from.first_name }
             : { id: -100500, type: 'group', title: 'Группа' },
         from: { ...from, is_bot: false },
-        text,
-        ...(command
-          ? { entities: [{ type: 'bot_command' as const, offset: 0, length: command.length }] }
-          : {}),
-      },
+        ...partial,
+      } as Update['message'],
     };
     await dispatch(update);
   }
 
   async function press(
     data: string,
-    opts: { messageId?: number; photo?: boolean } = {},
+    opts: { from?: Partial<TelegramFrom>; messageId?: number; photo?: boolean } = {},
   ): Promise<void> {
+    const from = { id: 42, first_name: 'Иван', username: 'ivan', ...opts.from };
     const update: Update = {
       update_id: updateId++,
       callback_query: {
         id: `cb${updateId}`,
-        from: { id: 42, is_bot: false, first_name: 'Иван', username: 'ivan' },
+        from: { ...from, is_bot: false },
         chat_instance: 'ci',
         data,
         message: {
           message_id: opts.messageId ?? 101,
           date: 0,
-          chat: { id: 42, type: 'private', first_name: 'Иван' },
+          chat: { id: from.id, type: 'private', first_name: from.first_name },
           ...(opts.photo
             ? { photo: [{ file_id: 'photo-file-id', file_unique_id: 'u', width: 1, height: 1 }] }
             : {}),
@@ -205,7 +362,7 @@ export function createHarness(overrides: Partial<BotDeps> = {}) {
   }
 
   async function chatMember(
-    status: 'kicked' | 'member',
+    status: 'kicked' | 'member' | 'left',
     from: Partial<TelegramFrom> = {},
   ): Promise<void> {
     const user = { id: 42, first_name: 'Иван', username: 'ivan', ...from };
@@ -231,5 +388,18 @@ export function createHarness(overrides: Partial<BotDeps> = {}) {
     await dispatch(update);
   }
 
-  return { bot, calls, services, now, config: deps.config, sendText, press, chatMember };
+  return {
+    bot,
+    calls,
+    services,
+    admin,
+    broadcasts,
+    adminInput,
+    now,
+    config: deps.config,
+    sendText,
+    sendMessage,
+    press,
+    chatMember,
+  };
 }

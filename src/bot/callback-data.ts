@@ -3,6 +3,7 @@ export type MenuAction = 'start' | 'buy' | 'about' | 'my' | 'plans' | 'close';
 export const cb = {
   menu: (a: MenuAction): string => `menu:${a}`,
   plan: (id: number): string => `plan:${id}`,
+  admin: (path: string): string => `adm:${path}`,
 };
 
 /** `plan:2` → 2; всё остальное (мусор, ноль, минус, дробь, слишком большое) → null. */

@@ -16,6 +16,13 @@ export const texts = {
   staleButton: 'Кнопка устарела, нажмите /start',
   genericError: 'Что-то пошло не так, попробуйте ещё раз.',
   admin: {
+    menuTitle: 'Админка',
+    buttons: {
+      broadcast: 'Рассылка',
+      subscribers: 'Подписчики',
+      plans: 'Тарифы',
+      base: 'База',
+    },
     planEnabled: 'включён',
     planHidden: 'скрыт',
     starsNotSet: 'не задана',
