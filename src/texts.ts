@@ -52,6 +52,20 @@ export const texts = {
       REFUNDED: 'возвращён',
       CHARGEBACK: 'чарджбэк',
     },
+    askSubscriber: 'Пришлите @username или Telegram ID',
+    badSubscriberQuery: 'Пришлите @username или числовой Telegram ID',
+    subscriberNotFound: 'Не найден. Человек должен хотя бы раз написать боту',
+    subscriberButtons: {
+      addDays: 'Добавить дни',
+      end: 'Завершить подписку',
+      endConfirm: 'Да, завершить',
+      cancel: 'Отмена',
+    },
+    askDays: 'Сколько дней добавить? Целое число от 1 до 3650',
+    badDays: 'Нужно целое число от 1 до 3650',
+    confirmEnd: (who: string) => `Завершить подписку ${who} сейчас? Деньги не возвращаются`,
+    subscriptionExtended: (date: string) => `Подписка продлена до ${date}`,
+    joinChannel: 'Вступить в канал',
     stats: (s: { users: number; reachable: number; blocked: number; active: number }) =>
       `Пользователей: ${s.users}
 Получат рассылку: ${s.reachable}
