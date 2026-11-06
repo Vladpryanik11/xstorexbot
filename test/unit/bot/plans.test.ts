@@ -17,8 +17,8 @@ describe('тарифы', () => {
     expect(msg?.payload.text).toBe('Выберите срок подписки:');
     expect(buttons(msg?.payload ?? {})).toEqual([
       { text: '490 ₽/мес. — 30 дней', callback_data: 'plan:1' },
-      { text: '390 ₽/мес. — 90 дней', callback_data: 'plan:2' },
       { text: '⭐ 290 ₽/мес. — 180 дней', callback_data: 'plan:3', style: 'primary' },
+      { text: '390 ₽/мес. — 90 дней', callback_data: 'plan:2' },
       { text: '‹ Назад', callback_data: 'menu:start' },
     ]);
   });

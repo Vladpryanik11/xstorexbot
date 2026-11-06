@@ -34,3 +34,16 @@ export function planScreenText(plan: PlanView, offerUrl: string): string {
     `Оплачивая, вы принимаете условия <a href="${escapeHtml(offerUrl)}">оферты</a>.`
   );
 }
+
+/** По возрастанию срока; выгодный тариф переносится в середину списка (позиция ⌊n/2⌋). */
+export function orderPlansForList<P extends PlanView>(
+  plans: readonly P[],
+  bestId: number | null,
+): P[] {
+  const sorted = [...plans].sort((a, b) => a.days - b.days);
+  const best = sorted.find((p) => p.id === bestId);
+  if (!best) return sorted;
+  const rest = sorted.filter((p) => p !== best);
+  rest.splice(Math.floor(sorted.length / 2), 0, best);
+  return rest;
+}

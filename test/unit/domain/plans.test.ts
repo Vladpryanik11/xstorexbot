@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { escapeHtml } from '../../../src/domain/html.js';
 import { formatRub, monthlyPriceRub } from '../../../src/domain/money.js';
-import { bestPlanId, planButtonLabel, planScreenText } from '../../../src/domain/plans.js';
+import {
+  bestPlanId,
+  orderPlansForList,
+  planButtonLabel,
+  planScreenText,
+} from '../../../src/domain/plans.js';
 
 const p90 = { id: 2, days: 90, priceRub: 117000, priceStars: null };
 
@@ -57,6 +62,23 @@ describe('plans', () => {
     expect(
       planScreenText({ id: 1, days: 30, priceRub: 49000, priceStars: null }, 'https://x.y'),
     ).toContain('Стоимость: 490 ₽\n');
+  });
+});
+
+describe('orderPlansForList', () => {
+  const p = (id: number, days: number) => ({ id, days, priceRub: 0, priceStars: null });
+  const ids = (list: { id: number }[]) => list.map((x) => x.id);
+
+  it('moves the best plan to the middle, others by days', () => {
+    expect(ids(orderPlansForList([p(3, 180), p(1, 30), p(2, 90)], 3))).toEqual([1, 3, 2]);
+    expect(ids(orderPlansForList([p(1, 30), p(2, 90), p(3, 180), p(4, 365)], 1))).toEqual([
+      2, 3, 1, 4,
+    ]);
+  });
+
+  it('two plans: best goes second; no best: plain order by days', () => {
+    expect(ids(orderPlansForList([p(1, 30), p(2, 90)], 1))).toEqual([2, 1]);
+    expect(ids(orderPlansForList([p(2, 90), p(1, 30)], null))).toEqual([1, 2]);
   });
 });
 
