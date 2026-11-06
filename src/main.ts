@@ -2,23 +2,14 @@ import { autoRetry } from '@grammyjs/auto-retry';
 import { run } from '@grammyjs/runner';
 import { createAdminServices } from './admin/index.js';
 import { createBot } from './bot/create-bot.js';
-import type { Broadcasts } from './broadcast/types.js';
+import { createBroadcasts } from './broadcast/index.js';
+import { createBroadcastStore } from './broadcast/store.js';
 import { type Config, ConfigError, loadConfig, secretValues } from './config.js';
 import { ContentError, loadContent } from './content.js';
 import { createPrisma } from './db.js';
 import { reportFatal } from './fatal.js';
 import { createLogger } from './logger.js';
 import { createServices } from './services/index.js';
-
-// TEMPORARY (задача 10 даёт реализацию, задача 12 подключает её здесь): пока рассылок нет.
-const temporaryBroadcastsStub: Broadcasts = {
-  countRecipients: async () => 0,
-  current: async () => null,
-  start: async () => ({ ok: false, reason: 'running' }),
-  stop: async () => false,
-  resume: async () => {},
-  idle: async () => {},
-};
 
 function fail(message: string): never {
   process.stderr.write(`${message}\n`);
@@ -70,14 +61,21 @@ async function main(): Promise<void> {
 
   const prisma = createPrisma(config.databaseUrl);
   const services = createServices(prisma);
+  const clock = (): Date => new Date();
+  const broadcasts = createBroadcasts({
+    store: createBroadcastStore(prisma),
+    api: () => bot.api,
+    clock,
+    logger,
+  });
   const bot = createBot(config.botToken, {
     config,
     content,
     services,
     logger,
-    clock: () => new Date(),
+    clock,
     admin: createAdminServices(prisma),
-    broadcasts: temporaryBroadcastsStub,
+    broadcasts,
   });
   // Не включать rethrowHttpErrors: тогда runner сам делает console.error для ошибок node-fetch,
   // а в их тексте есть URL с токеном бота.
@@ -85,6 +83,7 @@ async function main(): Promise<void> {
 
   // Неверный токен должен ронять запуск, а не первое обновление.
   await bot.init();
+  broadcasts.resume().catch((err) => logger.error({ err }, 'не удалось возобновить рассылку'));
 
   const runner = run(bot, {
     runner: {
@@ -109,6 +108,15 @@ async function main(): Promise<void> {
     try {
       await runner.stop();
       await runner.task();
+      // Рассылка остаётся RUNNING и продолжится после перезапуска.
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([
+        broadcasts.idle(),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, 10_000);
+        }),
+      ]);
+      clearTimeout(timer);
       await prisma.$disconnect();
       process.exit(0);
     } catch (err) {
