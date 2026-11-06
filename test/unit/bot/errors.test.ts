@@ -45,3 +45,31 @@ describe('обработка ошибок', () => {
     expect(String(alert?.payload.text).length).toBeLessThanOrEqual(300);
   });
 });
+
+describe('ошибка в обработчике кнопки', () => {
+  function failingPress() {
+    const h = createHarness();
+    h.services.touchUser = async () => {
+      throw new Error('db down');
+    };
+    return h;
+  }
+
+  it('callback_query получает ответ, чтобы не висел индикатор', async () => {
+    const h = failingPress();
+    await h.press('menu:about');
+    expect(h.calls.some((c) => c.method === 'answerCallbackQuery')).toBe(true);
+    expect(
+      h.calls.some((c) => c.method === 'sendMessage' && c.payload.text === texts.genericError),
+    ).toBe(true);
+  });
+
+  it('сбой answerCallbackQuery не пробрасывается', async () => {
+    const h = failingPress();
+    h.bot.api.config.use(async (prev, method, payload, signal) => {
+      if (method === 'answerCallbackQuery') throw new Error('network');
+      return prev(method, payload, signal);
+    });
+    await expect(h.press('menu:about')).resolves.toBeUndefined();
+  });
+});

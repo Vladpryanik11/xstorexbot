@@ -18,6 +18,15 @@ export async function handleBotError(
   const key = message.split('\n')[0] ?? '';
   await ordersChat.notifyError(key, `Ошибка: ${message}`.slice(0, 300));
 
+  // Без ответа на callback_query у кнопки в клиенте бесконечно крутится индикатор.
+  if (err.ctx.callbackQuery) {
+    try {
+      await err.ctx.answerCallbackQuery();
+    } catch (answerErr) {
+      deps.logger.error({ err: answerErr }, 'не удалось ответить на нажатие кнопки');
+    }
+  }
+
   if (err.ctx.chat?.type === 'private') {
     try {
       await err.ctx.reply(texts.genericError);

@@ -9,6 +9,8 @@ import { handleBotError } from './errors.js';
 import { touchUserMiddleware } from './middleware.js';
 import { type Clock, createOrdersChat } from './orders-chat.js';
 import { registerServiceCommands } from './user/commands.js';
+import { registerPlans } from './user/plans.js';
+import { registerStart } from './user/start.js';
 
 export type { Clock };
 
@@ -32,6 +34,8 @@ export function createBot(token: string, deps: BotDeps, botInfo?: UserFromGetMe)
   const priv = bot.chatType('private');
   priv.use(touchUserMiddleware(deps.services));
   registerServiceCommands(priv, deps);
+  registerStart(priv, deps);
+  registerPlans(priv, deps);
   // Обработчики кнопок этапа 2 добавляются выше; всё, что осталось, устарело.
   priv.on('callback_query:data', (ctx) => ctx.answerCallbackQuery({ text: texts.staleButton }));
 
