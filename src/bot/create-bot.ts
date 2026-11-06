@@ -9,6 +9,7 @@ import { handleBotError } from './errors.js';
 import { touchUserMiddleware } from './middleware.js';
 import { type Clock, createOrdersChat } from './orders-chat.js';
 import { Screens } from './screens.js';
+import { registerChatMember } from './user/chat-member.js';
 import { registerServiceCommands } from './user/commands.js';
 import { registerPlans } from './user/plans.js';
 import { registerStart } from './user/start.js';
@@ -33,7 +34,8 @@ export function createBot(token: string, deps: BotDeps, botInfo?: UserFromGetMe)
 
   // Всё, что не личный чат (например, чат заказов), игнорируется целиком.
   const priv = bot.chatType('private');
-  priv.use(touchUserMiddleware(deps.services));
+  priv.use(touchUserMiddleware(deps.services, deps.clock));
+  registerChatMember(priv, deps);
   registerServiceCommands(priv, deps);
   const screens = new Screens();
   registerStart(priv, deps, screens);

@@ -33,6 +33,7 @@ describe('служебные команды', () => {
     const h = createHarness();
     await h.sendText('привет', { from: { id: 7, first_name: 'Анна' } });
     expect(h.services.users).toEqual([{ id: 7, first_name: 'Анна', username: 'ivan' }]);
+    expect(h.services.seenAt).toEqual([h.now.value]);
   });
 
   it('незнакомая кнопка получает ответ «устарела»', async () => {

@@ -58,9 +58,20 @@ export class FakeServices implements Services {
     { id: 2, days: 90, priceRub: 117000, priceStars: null },
     { id: 3, days: 180, priceRub: 174000, priceStars: null },
   ];
-  touchUser: (from: TelegramFrom) => Promise<void> = async (from) => {
+  seenAt: Date[] = [];
+  blocked = new Map<number, Date | null>();
+  touchUser: (from: TelegramFrom, now: Date) => Promise<void> = async (from, now) => {
     this.users.push(from);
+    this.seenAt.push(now);
   };
+
+  async setBlocked(from: TelegramFrom, blockedAt: Date | null): Promise<void> {
+    this.blocked.set(from.id, blockedAt);
+  }
+
+  async markBlocked(userId: number, now: Date): Promise<void> {
+    this.blocked.set(userId, now);
+  }
 
   async getActiveUntil(userId: number, now: Date): Promise<Date | null> {
     const end = this.activeUntil.get(userId);
@@ -193,5 +204,32 @@ export function createHarness(overrides: Partial<BotDeps> = {}) {
     await dispatch(update);
   }
 
-  return { bot, calls, services, now, config: deps.config, sendText, press };
+  async function chatMember(
+    status: 'kicked' | 'member',
+    from: Partial<TelegramFrom> = {},
+  ): Promise<void> {
+    const user = { id: 42, first_name: 'Иван', username: 'ivan', ...from };
+    const botUser = { id: botInfo.id, is_bot: true as const, first_name: 'Test' };
+    const update: Update = {
+      update_id: updateId++,
+      my_chat_member: {
+        chat: { id: user.id, type: 'private', first_name: user.first_name },
+        from: { ...user, is_bot: false },
+        date: 0,
+        old_chat_member: {
+          status: status === 'kicked' ? 'member' : 'kicked',
+          user: botUser,
+          ...(status === 'kicked' ? {} : { until_date: 0 }),
+        } as never,
+        new_chat_member: {
+          status,
+          user: botUser,
+          ...(status === 'kicked' ? { until_date: 0 } : {}),
+        } as never,
+      },
+    };
+    await dispatch(update);
+  }
+
+  return { bot, calls, services, now, config: deps.config, sendText, press, chatMember };
 }
