@@ -107,6 +107,30 @@ describe('ввод админа', () => {
     expect(h.adminInput.get(1)).toBeUndefined();
   });
 
+  it.each(['/terms', '/paysupport'])('%s отменяет начатый ввод', async (command) => {
+    const h = createHarness();
+    onInput(h.adminInput, 'subscriberQuery', async (ctx) => {
+      await h.admin.findUserId({ username: ctx.message?.text ?? '' });
+    });
+    h.adminInput.set(1, { kind: 'subscriberQuery' });
+    await h.sendText(command, { from: admin });
+    await h.sendText('ivan', { from: admin });
+    expect(h.admin.calls.some((c) => c.method === 'findUserId')).toBe(false);
+    expect(h.adminInput.get(1)).toBeUndefined();
+  });
+
+  it('текст админа без состояния идёт в обычный поток', async () => {
+    const h = createHarness();
+    let called = false;
+    onInput(h.adminInput, 'subscriberQuery', async () => {
+      called = true;
+    });
+    await h.sendText('привет', { from: admin });
+    expect(called).toBe(false);
+    expect(h.services.users.map((u) => u.id)).toEqual([1]);
+    expect(h.calls.some((c) => c.method === 'sendMessage')).toBe(false);
+  });
+
   it('ввод не админа игнорируется', async () => {
     const h = createHarness();
     let called = false;

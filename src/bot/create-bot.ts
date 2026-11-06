@@ -7,7 +7,7 @@ import type { Content } from '../content.js';
 import type { Logger } from '../logger.js';
 import type { Services } from '../services/index.js';
 import { texts } from '../texts.js';
-import { AdminInput, registerAdmin } from './admin/index.js';
+import { AdminInput, cancelInputOnCommand, registerAdmin } from './admin/index.js';
 import { handleBotError } from './errors.js';
 import { touchUserMiddleware } from './middleware.js';
 import { type Clock, createOrdersChat } from './orders-chat.js';
@@ -45,6 +45,7 @@ export function createBot(
   // Всё, что не личный чат (например, чат заказов), игнорируется целиком.
   const priv = bot.chatType('private');
   priv.use(touchUserMiddleware(deps.services, deps.clock));
+  priv.use(cancelInputOnCommand(deps.config, adminInput));
   registerChatMember(priv, deps);
   registerServiceCommands(priv, deps);
   const screens = new Screens();

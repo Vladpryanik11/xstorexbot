@@ -1,4 +1,4 @@
-import { type Composer, GrammyError } from 'grammy';
+import { type Composer, GrammyError, type Middleware } from 'grammy';
 import type { Config } from '../../config.js';
 import type { BotContext } from '../context.js';
 import type { BotDeps } from '../create-bot.js';
@@ -13,6 +13,19 @@ export function isAdmin(config: Config, userId: number | undefined): boolean {
   return userId !== undefined && config.adminIds.includes(userId);
 }
 
+/**
+ * Любая команда отменяет начатый ввод. Ставится в самом начале цепочки, до обработчиков команд,
+ * которые не вызывают next().
+ */
+export function cancelInputOnCommand(config: Config, input: AdminInput): Middleware<BotContext> {
+  return async (ctx, next) => {
+    if (isAdmin(config, ctx.from?.id) && ctx.message?.text?.startsWith('/')) {
+      input.clear(ctx.from?.id as number);
+    }
+    await next();
+  };
+}
+
 /** Всё для админов в личном чате. Остальным команды и кнопки `adm:` не отвечают. */
 export function registerAdmin<C extends BotContext>(
   priv: Composer<C>,
@@ -21,12 +34,6 @@ export function registerAdmin<C extends BotContext>(
   input: AdminInput = new AdminInput(),
 ): void {
   const adm = priv.filter((ctx) => isAdmin(deps.config, ctx.from?.id));
-
-  // Любая команда отменяет начатый ввод и идёт дальше.
-  adm.use(async (ctx, next) => {
-    if (ctx.from && ctx.message?.text?.startsWith('/')) input.clear(ctx.from.id);
-    await next();
-  });
 
   adm.command('admin', async (ctx) => {
     try {
