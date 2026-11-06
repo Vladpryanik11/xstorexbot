@@ -31,8 +31,11 @@
     "vitest": "5.1.0"
   },
   "dependencies": {
+    "@grammyjs/auto-retry": "2.0.2",
+    "@grammyjs/runner": "2.0.3",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "grammy": "1.46.0",
     "pg": "8.23.1",
     "pino": "10.4.0",
     "zod": "4.6.7"
