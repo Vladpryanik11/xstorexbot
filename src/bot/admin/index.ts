@@ -5,6 +5,7 @@ import type { BotDeps } from '../create-bot.js';
 import type { Screens } from '../screens.js';
 import { AdminInput } from './input.js';
 import { registerMenu, showAdminMenu } from './menu.js';
+import { registerPlansSection } from './plans.js';
 
 export { AdminInput, onInput } from './input.js';
 export { showAdminMenu } from './menu.js';
@@ -45,7 +46,8 @@ export function registerAdmin<C extends BotContext>(
   });
 
   registerMenu(adm, deps, screens, input);
-  // Разделы «Тарифы», «Подписчики», «Рассылка» подключаются здесь (задачи 6, 7, 11).
+  registerPlansSection(adm, deps, screens, input);
+  // Разделы «Подписчики», «Рассылка» подключаются здесь (задачи 7, 11).
 
   // Последним: сообщение админа уходит обработчику его текущего ввода.
   adm.on('message', async (ctx, next) => {
