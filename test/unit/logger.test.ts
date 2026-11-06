@@ -83,4 +83,18 @@ describe('createLogger', () => {
     expect(out).not.toContain('payload');
     expect(out).not.toContain('unable to serialize');
   });
+
+  it('err не-Error пишется как есть, без разбора на символы', async () => {
+    const chunks: string[] = [];
+    const destination = new Writable({
+      write(chunk, _enc, cb) {
+        chunks.push(chunk.toString());
+        cb();
+      },
+    });
+    const logger = createLogger([], destination);
+    logger.error({ err: 'boom' }, 'x');
+    await new Promise((r) => setImmediate(r));
+    expect(JSON.parse(chunks.join('')).err).toBe('boom');
+  });
 });

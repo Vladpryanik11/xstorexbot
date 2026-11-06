@@ -123,10 +123,17 @@ export function secretValues(config: Config): string[] {
 const MIN_DB_PASSWORD_LENGTH = 8;
 
 function databasePasswords(databaseUrl: string): string[] {
+  let raw: string;
   try {
-    const raw = new URL(databaseUrl).password;
-    return [raw, decodeURIComponent(raw)].filter((p) => p.length >= MIN_DB_PASSWORD_LENGTH);
+    raw = new URL(databaseUrl).password;
   } catch {
     return [];
   }
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // битое %-кодирование: маскируем хотя бы сырой вид
+  }
+  return [raw, decoded].filter((p) => p.length >= MIN_DB_PASSWORD_LENGTH);
 }

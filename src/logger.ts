@@ -34,7 +34,8 @@ export function createLogger(
       level: 'info',
       serializers: {
         // payload запроса GrammyError может содержать InputFile и пользовательские данные.
-        err: (err: Error) => {
+        err: (err: unknown) => {
+          if (!(err instanceof Error)) return err;
           const { payload: _payload, ...rest } = pino.stdSerializers.err(err) as unknown as Record<
             string,
             unknown

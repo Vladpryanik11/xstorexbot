@@ -130,6 +130,13 @@ describe('secretValues: Platega и пароль БД', () => {
     expect(secretValues(loadConfig({ ...validEnv, DATABASE_URL: url }))).not.toContain('bot');
   });
 
+  it('битое %-кодирование: сырой пароль всё равно маскируется', () => {
+    const url = 'postgresql://bot:pass%zzword-123@127.0.0.1:5433/db';
+    expect(secretValues(loadConfig({ ...validEnv, DATABASE_URL: url }))).toContain(
+      'pass%zzword-123',
+    );
+  });
+
   it('невалидный DATABASE_URL не роняет secretValues', () => {
     expect(() =>
       secretValues(loadConfig({ ...validEnv, DATABASE_URL: 'not a url' })),
