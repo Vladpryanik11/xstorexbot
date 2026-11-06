@@ -64,6 +64,19 @@ describe('ошибка в обработчике кнопки', () => {
     ).toBe(true);
   });
 
+  it('порядок: ответ на кнопку, ответ покупателю, и только потом чат заказов', async () => {
+    const h = failingPress();
+    await h.press('menu:about');
+    const order = h.calls.map((c) =>
+      c.method === 'sendMessage' && c.payload.chat_id === TEST_ORDERS_CHAT_ID
+        ? 'orders'
+        : c.method === 'sendMessage'
+          ? 'customer'
+          : c.method,
+    );
+    expect(order).toEqual(['answerCallbackQuery', 'customer', 'orders']);
+  });
+
   it('сбой answerCallbackQuery не пробрасывается', async () => {
     const h = failingPress();
     h.bot.api.config.use(async (prev, method, payload, signal) => {

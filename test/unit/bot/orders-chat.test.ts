@@ -57,3 +57,16 @@ describe('createOrdersChat', () => {
     expect(lines.join('')).toContain('нет сети');
   });
 });
+
+describe('createOrdersChat: очистка ключей', () => {
+  it('устаревший ключ удаляется, после окна сообщение уходит снова', async () => {
+    const sent: string[] = [];
+    const { chat, now } = setup(async (t) => sent.push(t));
+    await chat.notifyError('old', 'раз');
+    now.value = new Date(now.value.getTime() + 10 * MINUTE);
+    await chat.notifyError('other', 'два');
+    expect(chat.size()).toBe(1);
+    await chat.notifyError('old', 'три');
+    expect(sent).toEqual(['раз', 'два', 'три']);
+  });
+});

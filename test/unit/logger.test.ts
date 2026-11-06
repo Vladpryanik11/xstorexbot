@@ -1,4 +1,5 @@
 import { Writable } from 'node:stream';
+import { GrammyError, InputFile } from 'grammy';
 import { describe, expect, it } from 'vitest';
 import { createLogger, redactSecrets } from '../../src/logger.js';
 
@@ -58,5 +59,28 @@ describe('createLogger', () => {
     expect(out).not.toContain(secret);
     expect(out).not.toContain(JSON.stringify(secret).slice(1, -1));
     expect(out).toContain('[скрыто]');
+  });
+
+  it('GrammyError: пишет описание, без payload и без «unable to serialize»', async () => {
+    const chunks: string[] = [];
+    const destination = new Writable({
+      write(chunk, _enc, cb) {
+        chunks.push(chunk.toString());
+        cb();
+      },
+    });
+    const logger = createLogger([], destination);
+    const err = new GrammyError(
+      'Call to sendPhoto failed!',
+      { ok: false, error_code: 400, description: 'Bad Request: wrong file identifier' },
+      'sendPhoto',
+      { chat_id: 1, photo: new InputFile(Buffer.from([1, 2, 3]), 'start.jpg') },
+    );
+    logger.error({ err }, 'x');
+    await new Promise((r) => setImmediate(r));
+    const out = chunks.join('');
+    expect(out).toContain('wrong file identifier');
+    expect(out).not.toContain('payload');
+    expect(out).not.toContain('unable to serialize');
   });
 });

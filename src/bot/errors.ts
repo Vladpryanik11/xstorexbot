@@ -15,15 +15,12 @@ export async function handleBotError(
   const message = redactSecrets(cause instanceof Error ? cause.message : String(cause), secrets);
   deps.logger.error({ err: cause }, 'ошибка при обработке обновления');
 
-  const key = message.split('\n')[0] ?? '';
-  await ordersChat.notifyError(key, `Ошибка: ${message}`.slice(0, 300));
-
   // Без ответа на callback_query у кнопки в клиенте бесконечно крутится индикатор.
   if (err.ctx.callbackQuery) {
     try {
       await err.ctx.answerCallbackQuery();
     } catch (answerErr) {
-      deps.logger.error({ err: answerErr }, 'не удалось ответить на нажатие кнопки');
+      deps.logger.warn({ err: answerErr }, 'не удалось ответить на нажатие кнопки');
     }
   }
 
@@ -34,4 +31,8 @@ export async function handleBotError(
       deps.logger.error({ err: replyErr }, 'не удалось отправить сообщение об ошибке покупателю');
     }
   }
+
+  // Уведомление владельцу идёт последним: его задержка или сбой не должны оставлять покупателя без ответа.
+  const key = message.split('\n')[0] ?? '';
+  await ordersChat.notifyError(key, `Ошибка: ${message}`.slice(0, 300));
 }

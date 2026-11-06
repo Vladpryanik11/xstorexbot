@@ -4,7 +4,8 @@ import { createBot } from './bot/create-bot.js';
 import { type Config, ConfigError, loadConfig, secretValues } from './config.js';
 import { ContentError, loadContent } from './content.js';
 import { createPrisma } from './db.js';
-import { createLogger, redactSecrets } from './logger.js';
+import { reportFatal } from './fatal.js';
+import { createLogger } from './logger.js';
 import { createServices } from './services/index.js';
 
 function fail(message: string): never {
@@ -12,7 +13,29 @@ function fail(message: string): never {
   process.exit(1);
 }
 
+function envSecrets(): string[] {
+  return [
+    process.env.BOT_TOKEN,
+    process.env.PLATEGA_SECRET,
+    process.env.PLATEGA_MERCHANT_ID,
+    process.env.BACKUP_PASSPHRASE,
+    process.env.CERT_ENCRYPTION_KEY,
+    process.env.DATABASE_URL,
+  ].filter((s): s is string => !!s);
+}
+
+// Пока настройки не разобраны, секреты берём из окружения; потом заменяем полным списком.
+let secrets = envSecrets();
+
+function die(err: unknown): never {
+  reportFatal(err, secrets);
+  process.exit(1);
+}
+
 async function main(): Promise<void> {
+  process.on('uncaughtException', die);
+  process.on('unhandledRejection', die);
+
   let config: Config;
   try {
     config = loadConfig(process.env);
@@ -22,7 +45,7 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  const secrets = secretValues(config);
+  secrets = secretValues(config);
   const logger = createLogger(secrets);
 
   let content: Awaited<ReturnType<typeof loadContent>>;
@@ -42,7 +65,9 @@ async function main(): Promise<void> {
     logger,
     clock: () => new Date(),
   });
-  bot.api.config.use(autoRetry());
+  // Не включать rethrowHttpErrors: тогда runner сам делает console.error для ошибок node-fetch,
+  // а в их тексте есть URL с токеном бота.
+  bot.api.config.use(autoRetry({ maxRetryAttempts: 3, maxDelaySeconds: 60 }));
 
   // Неверный токен должен ронять запуск, а не первое обновление.
   await bot.init();
@@ -85,15 +110,4 @@ async function main(): Promise<void> {
   if (!stopping) fail('Опрос Telegram остановился');
 }
 
-main().catch((err: unknown) => {
-  // Секреты неизвестны, если упала загрузка настроек; ConfigError обработан выше.
-  const raw = err instanceof Error ? err.message : String(err);
-  const secrets = [
-    process.env.BOT_TOKEN,
-    process.env.PLATEGA_SECRET,
-    process.env.BACKUP_PASSPHRASE,
-    process.env.CERT_ENCRYPTION_KEY,
-    process.env.DATABASE_URL,
-  ].filter((s): s is string => !!s);
-  fail(`Ошибка запуска: ${redactSecrets(raw, secrets)}`);
-});
+main().catch(die);

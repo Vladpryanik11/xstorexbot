@@ -29,5 +29,20 @@ export function createLogger(
       destination.write(redactSecrets(chunk.toString(), secrets), callback);
     },
   });
-  return pino({ level: 'info' }, redacting);
+  return pino(
+    {
+      level: 'info',
+      serializers: {
+        // payload запроса GrammyError может содержать InputFile и пользовательские данные.
+        err: (err: Error) => {
+          const { payload: _payload, ...rest } = pino.stdSerializers.err(err) as unknown as Record<
+            string,
+            unknown
+          >;
+          return rest;
+        },
+      },
+    },
+    redacting,
+  );
 }

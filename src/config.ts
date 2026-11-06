@@ -113,6 +113,20 @@ export function secretValues(config: Config): string[] {
       config.certEncryptionKeyText,
       config.certEncryptionKey.toString('base64'),
       config.backupPassphrase,
+      config.platega.merchantId,
+      ...databasePasswords(config.databaseUrl),
     ]),
   ];
+}
+
+// Короткие пароли (например dev-пароль «bot») не маскируем: они испортили бы обычный текст логов.
+const MIN_DB_PASSWORD_LENGTH = 8;
+
+function databasePasswords(databaseUrl: string): string[] {
+  try {
+    const raw = new URL(databaseUrl).password;
+    return [raw, decodeURIComponent(raw)].filter((p) => p.length >= MIN_DB_PASSWORD_LENGTH);
+  } catch {
+    return [];
+  }
 }

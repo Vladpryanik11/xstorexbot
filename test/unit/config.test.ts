@@ -108,6 +108,31 @@ describe('secretValues', () => {
       validEnv.PLATEGA_SECRET,
       key,
       validEnv.BACKUP_PASSPHRASE,
+      validEnv.PLATEGA_MERCHANT_ID,
     ]);
+  });
+});
+
+describe('secretValues: Platega и пароль БД', () => {
+  it('включает merchantId', () => {
+    expect(secretValues(loadConfig(validEnv))).toContain(validEnv.PLATEGA_MERCHANT_ID);
+  });
+
+  it('включает длинный пароль БД в обычном и декодированном виде', () => {
+    const url = 'postgresql://bot:p%40ss%2Fword-123@127.0.0.1:5433/db';
+    const values = secretValues(loadConfig({ ...validEnv, DATABASE_URL: url }));
+    expect(values).toContain('p%40ss%2Fword-123');
+    expect(values).toContain('p@ss/word-123');
+  });
+
+  it('короткий пароль (меньше 8 символов) не включается', () => {
+    const url = 'postgresql://bot:bot@127.0.0.1:5433/db';
+    expect(secretValues(loadConfig({ ...validEnv, DATABASE_URL: url }))).not.toContain('bot');
+  });
+
+  it('невалидный DATABASE_URL не роняет secretValues', () => {
+    expect(() =>
+      secretValues(loadConfig({ ...validEnv, DATABASE_URL: 'not a url' })),
+    ).not.toThrow();
   });
 });

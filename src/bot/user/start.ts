@@ -1,4 +1,4 @@
-import { type Composer, InlineKeyboard, InputFile } from 'grammy';
+import { type Composer, GrammyError, InlineKeyboard, InputFile } from 'grammy';
 import { formatDateMsk } from '../../domain/dates.js';
 import { texts } from '../../texts.js';
 import { cb } from '../callback-data.js';
@@ -28,10 +28,21 @@ export function registerStart<C extends BotContext>(composer: Composer<C>, deps:
     const caption = until
       ? `${deps.content.startText}\n\n${texts.subscriptionActiveUntil(formatDateMsk(until))}`
       : deps.content.startText;
-    const sent = await ctx.replyWithPhoto(
-      startPhotoFileId ?? new InputFile(deps.content.startImage, 'start.jpg'),
-      { caption, parse_mode: 'HTML', reply_markup: keyboard },
-    );
+    const upload = () => new InputFile(deps.content.startImage, 'start.jpg');
+    const extra = { caption, parse_mode: 'HTML', reply_markup: keyboard } as const;
+    let sent: Awaited<ReturnType<typeof ctx.replyWithPhoto>>;
+    if (startPhotoFileId === undefined) {
+      sent = await ctx.replyWithPhoto(upload(), extra);
+    } else {
+      try {
+        sent = await ctx.replyWithPhoto(startPhotoFileId, extra);
+      } catch (err) {
+        // Telegram отверг сохранённый file_id: сбрасываем кэш и загружаем файл заново (один раз).
+        if (!(err instanceof GrammyError) || err.error_code !== 400) throw err;
+        startPhotoFileId = undefined;
+        sent = await ctx.replyWithPhoto(upload(), extra);
+      }
+    }
     startPhotoFileId ??= sent.photo.at(-1)?.file_id;
   }
 

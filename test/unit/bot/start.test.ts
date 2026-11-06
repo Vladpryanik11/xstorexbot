@@ -1,4 +1,6 @@
+import { GrammyError } from 'grammy';
 import { describe, expect, it } from 'vitest';
+import { texts } from '../../../src/texts.js';
 import { createHarness } from '../helpers/harness.js';
 
 type Btn = { text: string; callback_data?: string; url?: string };
@@ -58,6 +60,53 @@ describe('/start', () => {
     expect(photos).toHaveLength(2);
     expect(typeof photos[0]?.payload.photo).not.toBe('string');
     expect(photos[1]?.payload.photo).toBe('photo-file-id');
+  });
+
+  it('file_id отвергнут (400): кэш сброшен, картинка загружена заново, меню отправлено', async () => {
+    const h = createHarness();
+    await h.sendText('/start');
+    const seen: unknown[] = [];
+    h.bot.api.config.use(async (prev, method, payload, signal) => {
+      if (method === 'sendPhoto') {
+        seen.push((payload as { photo: unknown }).photo);
+        if ((payload as { photo: unknown }).photo === 'photo-file-id') {
+          throw new GrammyError(
+            'Call to sendPhoto failed!',
+            { ok: false, error_code: 400, description: 'Bad Request: wrong file identifier' },
+            'sendPhoto',
+            {},
+          );
+        }
+      }
+      return prev(method, payload, signal);
+    });
+    await h.sendText('/start');
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).toBe('photo-file-id');
+    expect(typeof seen[1]).not.toBe('string');
+    const photos = h.calls.filter((c) => c.method === 'sendPhoto');
+    expect(photos.at(-1)?.payload.caption).toBe('Привет');
+    expect(h.calls.some((c) => c.payload.text === texts.genericError)).toBe(false);
+  });
+
+  it('другая ошибка отправки фото пробрасывается без повтора', async () => {
+    const h = createHarness();
+    await h.sendText('/start');
+    let attempts = 0;
+    h.bot.api.config.use(async (prev, method, payload, signal) => {
+      if (method === 'sendPhoto') {
+        attempts += 1;
+        throw new GrammyError(
+          'Call to sendPhoto failed!',
+          { ok: false, error_code: 500, description: 'Internal' },
+          'sendPhoto',
+          {},
+        );
+      }
+      return prev(method, payload, signal);
+    });
+    await h.sendText('/start');
+    expect(attempts).toBe(1);
   });
 
   it('/start paid_abc ведёт себя как /start', async () => {

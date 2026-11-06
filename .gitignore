@@ -5,3 +5,5 @@ src/generated
 content/
 coverage
 .superpowers/
+.env.*
+!.env.example
