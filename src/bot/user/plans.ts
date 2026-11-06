@@ -1,4 +1,4 @@
-import { type Composer, GrammyError, InlineKeyboard } from 'grammy';
+import { type Composer, InlineKeyboard } from 'grammy';
 import {
   bestPlanId,
   orderPlansForList,
@@ -9,12 +9,13 @@ import { texts } from '../../texts.js';
 import { cb, parsePlanId } from '../callback-data.js';
 import type { BotContext } from '../context.js';
 import type { BotDeps } from '../create-bot.js';
+import type { Screens } from '../screens.js';
 
-function isNotModified(err: unknown): boolean {
-  return err instanceof GrammyError && err.description.includes('message is not modified');
-}
-
-export function registerPlans<C extends BotContext>(composer: Composer<C>, deps: BotDeps): void {
+export function registerPlans<C extends BotContext>(
+  composer: Composer<C>,
+  deps: BotDeps,
+  screens: Screens,
+): void {
   async function planList(): Promise<{ text: string; keyboard: InlineKeyboard }> {
     const plans = await deps.services.listEnabledPlans();
     if (plans.length === 0) {
@@ -31,24 +32,15 @@ export function registerPlans<C extends BotContext>(composer: Composer<C>, deps:
       if (best) keyboard.style('primary');
       keyboard.row();
     }
-    keyboard.text(texts.buttons.back, cb.menu('start'));
+    keyboard.text(texts.buttons.back, cb.menu('close'));
     return { text: texts.planListTitle, keyboard };
   }
 
-  composer.callbackQuery(cb.menu('buy'), async (ctx) => {
+  // «Купить подписку» из меню и «‹ Назад» с экрана тарифа: одинаково показывают список.
+  composer.callbackQuery([cb.menu('buy'), cb.menu('plans')], async (ctx) => {
     await ctx.answerCallbackQuery();
     const { text, keyboard } = await planList();
-    await ctx.reply(text, { reply_markup: keyboard });
-  });
-
-  composer.callbackQuery(cb.menu('plans'), async (ctx) => {
-    await ctx.answerCallbackQuery();
-    const { text, keyboard } = await planList();
-    try {
-      await ctx.editMessageText(text, { reply_markup: keyboard });
-    } catch (err) {
-      if (!isNotModified(err)) throw err;
-    }
+    await screens.show(ctx, () => ctx.reply(text, { reply_markup: keyboard }));
   });
 
   composer.callbackQuery(/^plan:/, async (ctx) => {
@@ -59,14 +51,12 @@ export function registerPlans<C extends BotContext>(composer: Composer<C>, deps:
       return;
     }
     await ctx.answerCallbackQuery();
-    try {
-      await ctx.editMessageText(planScreenText(plan, deps.config.links.offer), {
+    await screens.show(ctx, () =>
+      ctx.reply(planScreenText(plan, deps.config.links.offer), {
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
         reply_markup: new InlineKeyboard().text(texts.buttons.back, cb.menu('plans')),
-      });
-    } catch (err) {
-      if (!isNotModified(err)) throw err;
-    }
+      }),
+    );
   });
 }

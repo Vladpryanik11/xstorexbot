@@ -1,4 +1,4 @@
-export type MenuAction = 'start' | 'buy' | 'about' | 'my' | 'plans';
+export type MenuAction = 'start' | 'buy' | 'about' | 'my' | 'plans' | 'close';
 
 export const cb = {
   menu: (a: MenuAction): string => `menu:${a}`,

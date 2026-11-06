@@ -169,7 +169,10 @@ export function createHarness(overrides: Partial<BotDeps> = {}) {
     await dispatch(update);
   }
 
-  async function press(data: string, opts: { messageId?: number } = {}): Promise<void> {
+  async function press(
+    data: string,
+    opts: { messageId?: number; photo?: boolean } = {},
+  ): Promise<void> {
     const update: Update = {
       update_id: updateId++,
       callback_query: {
@@ -181,6 +184,9 @@ export function createHarness(overrides: Partial<BotDeps> = {}) {
           message_id: opts.messageId ?? 101,
           date: 0,
           chat: { id: 42, type: 'private', first_name: 'Иван' },
+          ...(opts.photo
+            ? { photo: [{ file_id: 'photo-file-id', file_unique_id: 'u', width: 1, height: 1 }] }
+            : {}),
         },
       },
     };

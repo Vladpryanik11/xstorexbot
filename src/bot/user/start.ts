@@ -4,13 +4,18 @@ import { texts } from '../../texts.js';
 import { cb } from '../callback-data.js';
 import type { BotContext } from '../context.js';
 import type { BotDeps } from '../create-bot.js';
+import type { Screens } from '../screens.js';
 
-export function registerStart<C extends BotContext>(composer: Composer<C>, deps: BotDeps): void {
+export function registerStart<C extends BotContext>(
+  composer: Composer<C>,
+  deps: BotDeps,
+  screens: Screens,
+): void {
   // file_id загруженной картинки: первый раз грузим файл, дальше отправляем id.
   let startPhotoFileId: string | undefined;
 
-  async function sendMainMenu(ctx: C): Promise<void> {
-    if (!ctx.from) return;
+  async function sendMainMenu(ctx: C): Promise<{ message_id: number }> {
+    if (!ctx.from) throw new Error('нет отправителя');
     const until = await deps.services.getActiveUntil(ctx.from.id, deps.clock());
     const { links } = deps.config;
     // По две в ряд, от главного к справочному; «Моя подписка» и «О сервисе» занимают весь ряд.
@@ -44,18 +49,29 @@ export function registerStart<C extends BotContext>(composer: Composer<C>, deps:
       }
     }
     startPhotoFileId ??= sent.photo.at(-1)?.file_id;
+    return sent;
   }
 
   // Параметр после /start (например paid_abc) пока не используется.
-  composer.command('start', (ctx) => sendMainMenu(ctx));
+  composer.command('start', (ctx) => screens.resetMenu(ctx, () => sendMainMenu(ctx)));
 
   composer.callbackQuery(cb.menu('start'), async (ctx) => {
     await ctx.answerCallbackQuery();
-    await sendMainMenu(ctx);
+    await screens.resetMenu(ctx, () => sendMainMenu(ctx));
   });
 
   composer.callbackQuery(cb.menu('about'), async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply(deps.content.aboutText, { parse_mode: 'HTML' });
+    await screens.show(ctx, () =>
+      ctx.reply(deps.content.aboutText, {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard().text(texts.buttons.back, cb.menu('close')),
+      }),
+    );
+  });
+
+  composer.callbackQuery(cb.menu('close'), async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await screens.close(ctx);
   });
 }
