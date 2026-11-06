@@ -13,17 +13,17 @@ export function registerStart<C extends BotContext>(composer: Composer<C>, deps:
     if (!ctx.from) return;
     const until = await deps.services.getActiveUntil(ctx.from.id, deps.clock());
     const { links } = deps.config;
-    const keyboard = new InlineKeyboard()
+    // По две в ряд, от главного к справочному; «Моя подписка» и «О сервисе» занимают весь ряд.
+    const keyboard = new InlineKeyboard();
+    if (until) keyboard.text(texts.buttons.mySubscription, cb.menu('my')).row();
+    keyboard
       .text(texts.buttons.buy, cb.menu('buy'))
-      .row()
       .url(texts.buttons.catalog, links.catalog)
       .row()
       .url(texts.buttons.reviews, links.reviews)
+      .url(texts.buttons.support, links.support)
       .row()
-      .text(texts.buttons.about, cb.menu('about'))
-      .row()
-      .url(texts.buttons.support, links.support);
-    if (until) keyboard.row().text(texts.buttons.mySubscription, cb.menu('my'));
+      .text(texts.buttons.about, cb.menu('about'));
 
     const caption = until
       ? `${deps.content.startText}\n\n${texts.subscriptionActiveUntil(formatDateMsk(until))}`

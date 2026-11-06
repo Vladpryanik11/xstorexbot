@@ -4,33 +4,34 @@ import { texts } from '../../../src/texts.js';
 import { createHarness } from '../helpers/harness.js';
 
 type Btn = { text: string; callback_data?: string; url?: string };
-const buttons = (payload: Record<string, unknown>): Btn[] =>
-  (payload.reply_markup as { inline_keyboard: Btn[][] }).inline_keyboard.flat();
+const rows = (payload: Record<string, unknown>): Btn[][] =>
+  (payload.reply_markup as { inline_keyboard: Btn[][] }).inline_keyboard;
+const buttons = (payload: Record<string, unknown>): Btn[] => rows(payload).flat();
+const rowTexts = (payload: Record<string, unknown>): string[][] =>
+  rows(payload).map((r) => r.map((x) => x.text));
 
 describe('/start', () => {
-  it('без подписки: фото, подпись и 5 кнопок', async () => {
+  it('без подписки: фото, подпись и 5 кнопок по 2 в ряд, «О сервисе» внизу одна', async () => {
     const h = createHarness();
     await h.sendText('/start');
     const photo = h.calls.find((c) => c.method === 'sendPhoto');
     expect(photo).toBeDefined();
     expect(photo?.payload.caption).toBe('Привет');
     expect(photo?.payload.parse_mode).toBe('HTML');
-    const b = buttons(photo?.payload ?? {});
-    expect(b.map((x) => x.text)).toEqual([
-      'Купить подписку',
-      'Каталог приложений',
-      'Отзывы',
-      'О сервисе',
-      'Поддержка',
+    expect(rowTexts(photo?.payload ?? {})).toEqual([
+      ['Купить подписку', 'Каталог'],
+      ['Отзывы', 'Поддержка'],
+      ['О сервисе'],
     ]);
+    const b = buttons(photo?.payload ?? {});
     expect(b[0]?.callback_data).toBe('menu:buy');
     expect(b[1]?.url).toBe(h.config.links.catalog);
     expect(b[2]?.url).toBe(h.config.links.reviews);
-    expect(b[3]?.callback_data).toBe('menu:about');
-    expect(b[4]?.url).toBe(h.config.links.support);
+    expect(b[3]?.url).toBe(h.config.links.support);
+    expect(b[4]?.callback_data).toBe('menu:about');
   });
 
-  it('с активной подпиской: дата в подписи и кнопка «Моя подписка»', async () => {
+  it('с активной подпиской: дата в подписи и «Моя подписка» первым рядом', async () => {
     const h = createHarness();
     h.services.activeUntil.set(42, new Date('2026-12-15T12:00:00Z'));
     await h.sendText('/start');
@@ -38,9 +39,13 @@ describe('/start', () => {
     expect(String(photo?.payload.caption).endsWith('\n\nПодписка активна до 15.12.2026')).toBe(
       true,
     );
-    const b = buttons(photo?.payload ?? {});
-    expect(b.at(-1)?.text).toBe('Моя подписка');
-    expect(b.at(-1)?.callback_data).toBe('menu:my');
+    expect(rowTexts(photo?.payload ?? {})).toEqual([
+      ['Моя подписка'],
+      ['Купить подписку', 'Каталог'],
+      ['Отзывы', 'Поддержка'],
+      ['О сервисе'],
+    ]);
+    expect(buttons(photo?.payload ?? {})[0]?.callback_data).toBe('menu:my');
   });
 
   it('подписка в прошлом: кнопки «Моя подписка» нет', async () => {

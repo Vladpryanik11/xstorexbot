@@ -1,7 +1,7 @@
 export const texts = {
   buttons: {
     buy: 'Купить подписку',
-    catalog: 'Каталог приложений',
+    catalog: 'Каталог',
     reviews: 'Отзывы',
     about: 'О сервисе',
     support: 'Поддержка',
