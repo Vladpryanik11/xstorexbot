@@ -42,6 +42,17 @@ export interface BroadcastStore {
   stop(adminId: number, id: number, now: Date): Promise<boolean>;
 }
 
+const RUNNING_INDEX = 'Broadcast_one_running';
+
+/** P2002 именно по индексу одной идущей рассылки (adapter-pg кладёт имя индекса в meta). */
+function isRunningIndexViolation(e: unknown): boolean {
+  return (
+    e instanceof Prisma.PrismaClientKnownRequestError &&
+    e.code === 'P2002' &&
+    JSON.stringify(e.meta ?? {}).includes(RUNNING_INDEX)
+  );
+}
+
 export function createBroadcastStore(prisma: PrismaClient): BroadcastStore {
   async function summary(id: number): Promise<BroadcastSummary> {
     const row = await prisma.broadcast.findUniqueOrThrow({ where: { id } });
@@ -102,7 +113,7 @@ export function createBroadcastStore(prisma: PrismaClient): BroadcastStore {
         });
       } catch (e) {
         // Частичный уникальный индекс Broadcast_one_running: рассылка уже идёт.
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        if (isRunningIndexViolation(e)) {
           return { ok: false as const, reason: 'running' as const };
         }
         throw e;
@@ -132,8 +143,12 @@ export function createBroadcastStore(prisma: PrismaClient): BroadcastStore {
     async latest() {
       const id =
         (await running()) ??
-        (await prisma.broadcast.findFirst({ orderBy: { createdAt: 'desc' }, select: { id: true } }))
-          ?.id;
+        (
+          await prisma.broadcast.findFirst({
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            select: { id: true },
+          })
+        )?.id;
       return id === undefined ? null : summary(id);
     },
 
@@ -148,25 +163,29 @@ export function createBroadcastStore(prisma: PrismaClient): BroadcastStore {
     },
 
     async markSent(id, userId, now) {
-      await prisma.broadcastRecipient.update({
-        where: { broadcastId_userId: { broadcastId: id, userId: BigInt(userId) } },
+      await prisma.broadcastRecipient.updateMany({
+        where: { broadcastId: id, userId: BigInt(userId), status: 'PENDING' },
         data: { status: 'SENT', sentAt: now },
       });
     },
 
     async markBlocked(id, userId, now) {
-      await prisma.$transaction([
-        prisma.broadcastRecipient.update({
-          where: { broadcastId_userId: { broadcastId: id, userId: BigInt(userId) } },
+      await prisma.$transaction(async (tx) => {
+        const res = await tx.broadcastRecipient.updateMany({
+          where: { broadcastId: id, userId: BigInt(userId), status: 'PENDING' },
           data: { status: 'BLOCKED' },
-        }),
-        prisma.user.update({ where: { id: BigInt(userId) }, data: { blockedAt: now } }),
-      ]);
+        });
+        if (res.count === 0) return;
+        await tx.user.updateMany({
+          where: { id: BigInt(userId), blockedAt: null },
+          data: { blockedAt: now },
+        });
+      });
     },
 
     async markFailed(id, userId, error) {
-      await prisma.broadcastRecipient.update({
-        where: { broadcastId_userId: { broadcastId: id, userId: BigInt(userId) } },
+      await prisma.broadcastRecipient.updateMany({
+        where: { broadcastId: id, userId: BigInt(userId), status: 'PENDING' },
         data: { status: 'FAILED', error },
       });
     },

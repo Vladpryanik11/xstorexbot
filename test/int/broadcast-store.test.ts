@@ -72,6 +72,7 @@ describe('create', () => {
     await mkUser(10);
     const results = await Promise.all([store.create(input, now), store.create(input, now)]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.find((r) => !r.ok)).toEqual({ ok: false, reason: 'running' });
     expect(await prisma.broadcast.count()).toBe(1);
     expect(await prisma.broadcastRecipient.count()).toBe(1);
   });
@@ -108,6 +109,33 @@ describe('recipient marks', () => {
     expect(rec.status).toBe('BLOCKED');
     const user = await prisma.user.findUniqueOrThrow({ where: { id: 11n } });
     expect(user.blockedAt).toEqual(later);
+  });
+
+  it('a final recipient state is not overwritten by a late mark', async () => {
+    const id = await startWithUsers();
+    await store.markSent(id, 10, now);
+    await store.markFailed(id, 10, 'late');
+    await store.markBlocked(id, 10, later);
+    const rec = await prisma.broadcastRecipient.findFirstOrThrow({ where: { userId: 10n } });
+    expect(rec).toMatchObject({ status: 'SENT', error: null });
+    expect(rec.sentAt).toEqual(now);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: 10n } });
+    expect(user.blockedAt).toBeNull();
+  });
+
+  it('repeated markBlocked keeps the first blockedAt', async () => {
+    const id = await startWithUsers();
+    await store.markBlocked(id, 11, now);
+    await store.markBlocked(id, 11, later);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: 11n } });
+    expect(user.blockedAt).toEqual(now);
+  });
+
+  it('marking a non-existent recipient does not throw', async () => {
+    const id = await startWithUsers();
+    await store.markSent(id, 999, now);
+    await store.markFailed(id, 999, 'x');
+    await store.markBlocked(id, 999, now);
   });
 
   it('setProgressMessage is stored', async () => {
