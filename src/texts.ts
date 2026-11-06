@@ -66,6 +66,16 @@ export const texts = {
     confirmEnd: (who: string) => `Завершить подписку ${who} сейчас? Деньги не возвращаются`,
     subscriptionExtended: (date: string) => `Подписка продлена до ${date}`,
     joinChannel: 'Вступить в канал',
+    broadcastProgress: (sent: number, total: number) => `Рассылка: отправлено ${sent} из ${total}`,
+    broadcastTitles: {
+      DONE: 'Рассылка завершена.',
+      STOPPED: 'Рассылка остановлена',
+      FAILED: 'Рассылка прервана: исходное сообщение удалено',
+    },
+    broadcastDelivered: (n: number) => `Доставлено: ${n}`,
+    broadcastBlocked: (n: number) => `Заблокировали бота: ${n}`,
+    broadcastErrors: (n: number) => `Ошибки: ${n}`,
+    broadcastPending: (n: number) => `Не отправлено: ${n}`,
     stats: (s: { users: number; reachable: number; blocked: number; active: number }) =>
       `Пользователей: ${s.users}
 Получат рассылку: ${s.reachable}
