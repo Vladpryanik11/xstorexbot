@@ -121,20 +121,34 @@ export function createBroadcasts(opts: {
     if (!stopRequested.has(b.id)) await store.finish(b.id, 'DONE', clock());
   }
 
+  /** Финальная правка прогресса без кнопки и отчёт новым сообщением; сбой отчёта не критичен. */
+  async function finalize(
+    adminId: number,
+    progressMessageId: number | null,
+    id: number,
+  ): Promise<void> {
+    try {
+      await updateProgress(adminId, progressMessageId, id, true);
+      await opts.api().sendMessage(adminId, reportText(await store.summary(id)));
+    } catch (err) {
+      logFailure('broadcast report failed', err);
+    }
+  }
+
   async function runLoop(id: number): Promise<void> {
     try {
       const b = await store.get(id);
       if (b?.status !== 'RUNNING') return;
       await sendAll(b);
       // Отчёт и после остановки, и после прерывания, и после обычного конца.
-      await updateProgress(b.adminId, b.progressMessageId, id, true);
-      await opts.api().sendMessage(b.adminId, reportText(await store.summary(id)));
+      await finalize(b.adminId, b.progressMessageId, id);
     } catch (err) {
       // Рассылка остаётся RUNNING и продолжится после перезапуска (resume).
       logFailure('broadcast loop aborted', err);
     } finally {
       stopRequested.delete(id);
-      loopBroadcastId = null;
+      // Состояние могло уже перейти к более новой рассылке.
+      if (loopBroadcastId === id) loopBroadcastId = null;
     }
   }
 
@@ -164,8 +178,15 @@ export function createBroadcasts(opts: {
 
     async stop(adminId, broadcastId) {
       const stopped = await store.stop(adminId, broadcastId, clock());
-      if (stopped) stopRequested.add(broadcastId);
-      return stopped;
+      if (!stopped) return false;
+      if (loopBroadcastId === broadcastId) {
+        stopRequested.add(broadcastId);
+        return true;
+      }
+      // Цикла в этом процессе нет (прервался или ещё не возобновлён): отчёт отправляем сами.
+      const b = await store.get(broadcastId);
+      if (b) await finalize(b.adminId, b.progressMessageId, broadcastId);
+      return true;
     },
 
     async resume() {

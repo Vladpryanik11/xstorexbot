@@ -39,6 +39,7 @@ function setup() {
   const hooks = {
     copy: async (_to: number): Promise<void> => {},
     edit: async (): Promise<void> => {},
+    send: async (_text: string): Promise<void> => {},
   };
   const api: SenderApi = {
     copyMessage: (async (to: number, from: number, msg: number, other?: unknown) => {
@@ -48,6 +49,7 @@ function setup() {
     }) as unknown as SenderApi['copyMessage'],
     sendMessage: (async (chatId: number, text: string, other?: unknown) => {
       sends.push({ chatId, text, other });
+      await hooks.send(text);
       return { message_id: 900 + sends.length };
     }) as unknown as SenderApi['sendMessage'],
     editMessageText: (async (_chat: number, _mid: number, text: string, other?: unknown) => {
@@ -266,5 +268,93 @@ describe('broadcast sender', () => {
     await s.broadcasts.idle();
     expect((await store.summary(res.id)).status).toBe('RUNNING');
     expect(s.logged.length).toBeGreaterThan(0);
+  });
+
+  it('stop without a running loop edits progress and sends the report itself', async () => {
+    await mkUsers([10, 11]);
+    const created = await store.create(input, new Date('2026-11-07T10:00:00Z'));
+    if (!created.ok) throw new Error('create failed');
+    await store.setProgressMessage(created.id, 777);
+    const s = setup();
+    expect(await s.broadcasts.stop(ADMIN, created.id)).toBe(true);
+    expect((await store.summary(created.id)).status).toBe('STOPPED');
+    expect(s.copies).toHaveLength(0);
+    expect(s.edits).toHaveLength(1);
+    expect(s.edits[0]?.other).toBeUndefined();
+    expect(s.sends.at(-1)).toMatchObject({ chatId: ADMIN });
+    expect(s.sends.at(-1)?.text).toMatch(/^Рассылка остановлена/);
+  });
+
+  it('a finishing loop does not clear the state of a newer broadcast', async () => {
+    await mkUsers([10]);
+    const s = setup();
+    let releaseReport: () => void = () => {};
+    const reportGate = new Promise<void>((r) => {
+      releaseReport = r;
+    });
+    let reportReached: () => void = () => {};
+    const reached = new Promise<void>((r) => {
+      reportReached = r;
+    });
+    s.hooks.send = async (text) => {
+      if (text.startsWith('Рассылка завершена')) {
+        reportReached();
+        await reportGate;
+      }
+    };
+    const a = await s.broadcasts.start(input);
+    if (!a.ok) throw new Error('start failed');
+    const loopA = s.broadcasts.idle();
+    await reached;
+
+    let releaseCopy: () => void = () => {};
+    const copyGate = new Promise<void>((r) => {
+      releaseCopy = r;
+    });
+    s.hooks.copy = async () => {
+      await copyGate;
+    };
+    const b = await s.broadcasts.start(input);
+    if (!b.ok) throw new Error('start B failed');
+
+    releaseReport();
+    await loopA;
+    await s.broadcasts.resume();
+    // Даём возможному второму циклу дойти до copyMessage, пока первый заблокирован.
+    await new Promise((r) => setTimeout(r, 300));
+    releaseCopy();
+    await s.broadcasts.idle();
+    expect(s.copies).toHaveLength(2);
+    expect((await store.summary(b.id)).status).toBe('DONE');
+  });
+
+  it('resume is a no-op while a loop is running', async () => {
+    await mkUsers([10]);
+    const s = setup();
+    let releaseCopy: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      releaseCopy = r;
+    });
+    s.hooks.copy = async () => {
+      await gate;
+    };
+    const res = await s.broadcasts.start(input);
+    if (!res.ok) throw new Error('start failed');
+    await s.broadcasts.resume();
+    releaseCopy();
+    await s.broadcasts.idle();
+    expect(s.copies).toHaveLength(1);
+  });
+
+  it('logs a failed report without claiming the loop aborted', async () => {
+    await mkUsers([10]);
+    const s = setup();
+    s.hooks.send = async (text) => {
+      if (text.startsWith('Рассылка завершена')) throw new Error('send failed');
+    };
+    const id = await run(s);
+    expect((await store.summary(id)).status).toBe('DONE');
+    expect(JSON.stringify(s.logged)).toContain('broadcast report failed');
+    expect(JSON.stringify(s.logged)).not.toContain('loop aborted');
   });
 });
