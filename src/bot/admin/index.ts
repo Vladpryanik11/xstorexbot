@@ -3,6 +3,7 @@ import type { Config } from '../../config.js';
 import type { BotContext } from '../context.js';
 import type { BotDeps } from '../create-bot.js';
 import type { Screens } from '../screens.js';
+import { registerBroadcastSection } from './broadcast.js';
 import { AdminInput } from './input.js';
 import { registerMenu, showAdminMenu } from './menu.js';
 import { registerPlansSection } from './plans.js';
@@ -49,7 +50,7 @@ export function registerAdmin<C extends BotContext>(
   registerMenu(adm, deps, screens, input);
   registerPlansSection(adm, deps, screens, input);
   registerSubscribersSection(adm, deps, screens, input);
-  // Раздел «Рассылка» подключается здесь (задача 11).
+  registerBroadcastSection(adm, deps, screens, input);
 
   // Последним: сообщение админа уходит обработчику его текущего ввода.
   adm.on('message', async (ctx, next) => {
