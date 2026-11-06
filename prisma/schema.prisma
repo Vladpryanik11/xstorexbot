@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PaymentProvider {
+  PLATEGA
+  STARS
+  MANUAL
+}
+
+enum PaymentCurrency {
+  RUB
+  XTR
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELED
+  EXPIRED
+  REFUNDED
+  CHARGEBACK
+}
+
+enum CertRequestStatus {
+  OPEN
+  ISSUED
+  REJECTED
+}
+
+model User {
+  id             BigInt    @id
+  username       String?
+  firstName      String
+  createdAt      DateTime  @default(now())
+  blockedAt      DateTime?
+  udidExpectedAt DateTime?
+
+  subscription Subscription?
+  payments     Payment[]
+  certRequests CertRequest[]
+}
+
+model Plan {
+  id         Int     @id @default(autoincrement())
+  days       Int     @unique
+  priceRub   Int
+  priceStars Int?
+  enabled    Boolean @default(true)
+  sort       Int
+
+  payments Payment[]
+}
+
+model Subscription {
+  userId         BigInt    @id
+  endsAt         DateTime
+  reminded3dAt   DateTime?
+  reminded1dAt   DateTime?
+  removedAt      DateTime?
+  removeAttempts Int       @default(0)
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Payment {
+  id                String          @id @default(uuid()) @db.Uuid
+  userId            BigInt
+  planId            Int?
+  provider          PaymentProvider
+  days              Int
+  amount            Int
+  currency          PaymentCurrency
+  status            PaymentStatus   @default(PENDING)
+  providerStatus    String?
+  providerPaymentId String?         @unique
+  paymentUrl        String?
+  createdAt         DateTime        @default(now())
+  paidAt            DateTime?
+  appliedAt         DateTime?
+  lastCheckedAt     DateTime?
+  createdByAdminId  BigInt?
+
+  user User  @relation(fields: [userId], references: [id])
+  plan Plan? @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@index([status, createdAt])
+}
+
+model CertRequest {
+  id                   Int               @id @default(autoincrement())
+  userId               BigInt
+  udid                 String
+  status               CertRequestStatus @default(OPEN)
+  p12Enc               Bytes?
+  profileEnc           Bytes?
+  passwordEnc          Bytes?
+  certExpiresAt        DateTime?
+  ordersChatMessageId  Int?
+  createdAt            DateTime          @default(now())
+  issuedAt             DateTime?
+  issuedByAdminId      BigInt?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model AdminLog {
+  id           Int      @id @default(autoincrement())
+  adminId      BigInt
+  action       String
+  targetUserId BigInt?
+  details      Json?
+  createdAt    DateTime @default(now())
+}
