@@ -1,5 +1,6 @@
 import { type Composer, GrammyError, type Middleware } from 'grammy';
 import type { Config } from '../../config.js';
+import { texts } from '../../texts.js';
 import type { BotContext } from '../context.js';
 import type { BotDeps } from '../create-bot.js';
 import type { Screens } from '../screens.js';
@@ -51,6 +52,9 @@ export function registerAdmin<C extends BotContext>(
   registerPlansSection(adm, deps, screens, input);
   registerSubscribersSection(adm, deps, screens, input);
   registerBroadcastSection(adm, deps, screens, input);
+
+  // Старая или неизвестная кнопка админки у админа — не «Нет прав».
+  adm.callbackQuery(/^adm:/, (ctx) => ctx.answerCallbackQuery({ text: texts.staleButton }));
 
   // Последним: сообщение админа уходит обработчику его текущего ввода.
   adm.on('message', async (ctx, next) => {

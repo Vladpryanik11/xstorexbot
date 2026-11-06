@@ -152,7 +152,8 @@ export function createBroadcasts(opts: {
       if (b?.status !== 'RUNNING') return;
       await sendAll(b);
       // Остановка процесса: статус остаётся RUNNING, отчёт придёт после возобновления.
-      if (shuttingDown) return;
+      // Если до этого нажали «Остановить», отчёт об остановке всё равно отправляем.
+      if (shuttingDown && !stopRequested.has(id)) return;
       // Отчёт и после остановки, и после прерывания, и после обычного конца.
       await finalize(b.adminId, b.progressMessageId, id);
     } catch (err) {

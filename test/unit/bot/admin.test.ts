@@ -60,6 +60,21 @@ describe('кнопки админки', () => {
     expect(h.calls.some((c) => c.method === 'sendMessage')).toBe(false);
   });
 
+  it('неизвестная кнопка adm: у админа — «Кнопка устарела», а не «Нет прав»', async () => {
+    const h = createHarness();
+    await h.press('adm:plan:1:toggle', { from: admin });
+    const answer = h.calls.find((c) => c.method === 'answerCallbackQuery');
+    expect(answer?.payload.text).toBe(texts.staleButton);
+  });
+
+  it('adm:bc:stop от не админа — «Нет прав», рассылка не трогается', async () => {
+    const h = createHarness();
+    await h.press('adm:bc:stop:1');
+    const answer = h.calls.find((c) => c.method === 'answerCallbackQuery');
+    expect(answer?.payload.text).toBe(texts.noRights);
+    expect(h.broadcasts.calls).toEqual([]);
+  });
+
   it('«База» показывает счётчики и «‹ Назад» → adm:menu', async () => {
     const h = createHarness();
     h.admin.stats = { users: 1250, reachable: 1180, blocked: 70, active: 312 };
